@@ -190,6 +190,7 @@ pnpm run pack
 注意：
 
 - `pack` 前请先执行 `build`
+- 包内 `manifest.json` 会把 `main` 改写为包内实际入口 `main.js`
 - 插件根目录下的 `icon.png` 会被一起打进包里
 - 如果是 React 插件，确保 `ui/` 构建产物已经生成
 

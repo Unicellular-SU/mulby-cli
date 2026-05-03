@@ -5,8 +5,10 @@ import chalk from 'chalk'
 import type { Archiver } from 'archiver'
 
 interface PluginPackageManifest {
+  [key: string]: unknown
   name: string
   version: string
+  main?: string
   preload?: string
   dependencies?: Record<string, string>
   assets?: string[]
@@ -72,10 +74,10 @@ async function createArchive(
     const addedArchivePaths = new Set<string>()
     const addedPackages = new Set<string>()
 
-    // 添加 manifest.json
-    addFileToArchive(archive, addedArchivePaths, {
-      sourcePath: path.join(cwd, 'manifest.json'),
-      archivePath: 'manifest.json'
+    // 添加包内 manifest.json，并让 main 指向包内实际入口
+    addJsonToArchive(archive, addedArchivePaths, {
+      archivePath: 'manifest.json',
+      value: createPackagedManifest(manifest)
     })
 
     // 添加打包后的 main.js
@@ -350,6 +352,26 @@ function addFileToArchive(
   addedArchivePaths.add(archivePath)
   archive.file(input.sourcePath, { name: archivePath })
   if (stats) stats.files++
+}
+
+function addJsonToArchive(
+  archive: Archiver,
+  addedArchivePaths: Set<string>,
+  input: { archivePath: string; value: unknown },
+  stats?: ArchiveStats
+): void {
+  const archivePath = normalizeArchivePath(input.archivePath)
+  if (!archivePath || addedArchivePaths.has(archivePath)) return
+  addedArchivePaths.add(archivePath)
+  archive.append(`${JSON.stringify(input.value, null, 2)}\n`, { name: archivePath })
+  if (stats) stats.files++
+}
+
+function createPackagedManifest(manifest: PluginPackageManifest): PluginPackageManifest {
+  return {
+    ...manifest,
+    main: ENTRY_MAIN_ARCHIVE_NAME
+  }
 }
 
 function normalizeArchivePath(input: string): string | null {
