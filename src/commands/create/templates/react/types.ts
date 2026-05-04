@@ -713,6 +713,31 @@ interface MulbyMenu {
   showContextMenu(items: ContextMenuItem[]): Promise<string | null>
 }
 
+interface GlobalInputEvent {
+  type: 'mouseMove' | 'mouseDown' | 'mouseUp' | 'mouseScroll' | 'keyDown' | 'keyUp'
+  timestamp: number
+  x: number
+  y: number
+  button?: 'left' | 'right' | 'middle'
+  clickCount?: number
+  scrollDeltaX?: number
+  scrollDeltaY?: number
+  keyCode?: number
+  key?: string
+  shift: boolean
+  ctrl: boolean
+  alt: boolean
+  meta: boolean
+}
+
+interface MulbyInputMonitor {
+  isAvailable(): Promise<boolean>
+  requireAccessibility(): Promise<boolean>
+  start(options?: { mouse?: boolean; keyboard?: boolean; throttleMs?: number }): Promise<string | null>
+  stop(sessionId: string): Promise<void>
+  onEvent(callback: (event: GlobalInputEvent) => void): Disposable
+}
+
 interface MulbyGeolocation {
   getAccessStatus(): Promise<'not-determined' | 'granted' | 'denied' | 'restricted' | 'unknown'>
   requestAccess(): Promise<'not-determined' | 'granted' | 'denied' | 'restricted' | 'unknown'>
@@ -1579,6 +1604,7 @@ interface MulbyAPI {
   systemPage: MulbySystemPage
   clipboard: MulbyClipboard
   input: MulbyInput
+  inputMonitor: MulbyInputMonitor
   notification: MulbyNotification
   window: MulbyWindow
   subInput: MulbySubInput
@@ -1944,6 +1970,13 @@ interface BackendPluginAPIDirect {
     simulateMouseClick(x: number, y: number): Promise<boolean>
     simulateMouseDoubleClick(x: number, y: number): Promise<boolean>
     simulateMouseRightClick(x: number, y: number): Promise<boolean>
+  }
+  inputMonitor: {
+    isAvailable(): boolean
+    requireAccessibility(): Promise<boolean>
+    start(options?: { mouse?: boolean; keyboard?: boolean; throttleMs?: number }, callback?: (event: GlobalInputEvent) => void): Promise<string | null>
+    stop(sessionId: string): void
+    onEvent(sessionId: string, callback: (event: GlobalInputEvent) => void): void
   }
   permission: {
     getStatus(type: BackendPermissionType): any
