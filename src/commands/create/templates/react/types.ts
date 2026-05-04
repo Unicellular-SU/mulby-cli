@@ -97,12 +97,19 @@ interface BrowserWindowProxy {
   show(): Promise<void>
   hide(): Promise<void>
   close(): Promise<void>
+  destroy(): Promise<void>
   focus(): Promise<void>
+  showInactive(): Promise<void>
   setTitle(title: string): Promise<void>
   setSize(width: number, height: number): Promise<void>
   setPosition(x: number, y: number): Promise<void>
   setBounds(bounds: { x?: number; y?: number; width?: number; height?: number }): Promise<boolean>
+  getBounds(): Promise<{ x: number; y: number; width: number; height: number }>
   setOpacity(opacity: number): Promise<void>
+  setIgnoreMouseEvents(ignore: boolean, options?: { forward?: boolean }): Promise<void>
+  setAlwaysOnTop(flag: boolean, level?: string): Promise<void>
+  setVisibleOnAllWorkspaces(flag: boolean, options?: { visibleOnFullScreen?: boolean }): Promise<void>
+  setFullScreen(flag: boolean): Promise<void>
   postMessage(channel: string, ...args: unknown[]): Promise<void>
 }
 
@@ -122,12 +129,24 @@ interface MulbyWindow {
     titleBar?: boolean;
     fullscreen?: boolean;
     alwaysOnTop?: boolean;
+    alwaysOnTopLevel?: string;
     resizable?: boolean;
+    movable?: boolean;
+    minimizable?: boolean;
+    maximizable?: boolean;
+    fullscreenable?: boolean;
+    focusable?: boolean;
+    skipTaskbar?: boolean;
+    enableLargerThanScreen?: boolean;
     x?: number; y?: number;
     minWidth?: number; minHeight?: number;
     maxWidth?: number; maxHeight?: number;
     opacity?: number;
     transparent?: boolean;
+    visibleOnAllWorkspaces?: boolean;
+    visibleOnFullScreen?: boolean;
+    ignoreMouseEvents?: boolean;
+    forwardMouseEvents?: boolean;
     position?: 'default' | 'capture-region';
     fit?: 'default' | 'capture-region' | 'capture-region-with-toolbar';
     captureToolbarHeight?: number;
@@ -488,6 +507,10 @@ interface MulbyScreen {
   getMediaStreamConstraints(options: { sourceId: string; audio?: boolean; frameRate?: number }): Promise<object>
   screenCapture(): Promise<string | null>
   colorPick(): Promise<ColorPickResult | null>
+  screenToDipPoint(point: { x: number; y: number }): Promise<{ x: number; y: number }>
+  dipToScreenPoint(point: { x: number; y: number }): Promise<{ x: number; y: number }>
+  screenToDipRect(rect: { x: number; y: number; width: number; height: number }): Promise<{ x: number; y: number; width: number; height: number }>
+  dipToScreenRect(rect: { x: number; y: number; width: number; height: number }): Promise<{ x: number; y: number; width: number; height: number }>
 }
 
 interface CommandAuditItem {
@@ -783,6 +806,26 @@ interface MulbyStorage {
   transaction(ops: { op: 'set' | 'remove'; key: string; value?: unknown; expectedVersion?: number | null }[], options?: { namespace?: string }): Promise<{ success: boolean; committed: number }>
   append(key: string, chunk: unknown, options?: { namespace?: string; maxItems?: number }): Promise<{ ok: boolean; newLength: number; version: number }>
   watch(options: { namespace?: string; prefix?: string }, callback: (event: { type: 'set' | 'remove' | 'clear'; key: string; namespace: string; version?: number; updatedAt: number }) => void): () => void
+  encrypted: {
+    set(key: string, value: unknown): Promise<boolean>
+    get(key: string): Promise<unknown | undefined>
+    remove(key: string): Promise<boolean>
+    has(key: string): Promise<boolean>
+  }
+  attachment: {
+    put(id: string, data: ArrayBuffer | Uint8Array, mimeType: string): Promise<boolean>
+    get(id: string): Promise<Uint8Array | null>
+    getType(id: string): Promise<string | null>
+    remove(id: string): Promise<boolean>
+    list(prefix?: string): Promise<{ id: string; mimeType: string; size: number }[]>
+  }
+}
+
+interface MainPushItem {
+  icon?: string
+  title: string
+  text: string
+  [key: string]: unknown
 }
 
 interface Task {
@@ -1647,6 +1690,7 @@ interface MulbyAPI {
     mode: 'panel'
   }) => void): Disposable
   onPluginDetached(callback: () => void): Disposable
+  onPluginOut(callback: (isKill: boolean) => void): Disposable
   onPluginLaunchStart(callback: (data: PluginLaunchStartEvent) => void): Disposable
   onPluginLaunchEnd(callback: (data: PluginLaunchEndEvent) => void): Disposable
   onThemeChange(callback: (theme: 'light' | 'dark') => void): Disposable
@@ -1822,7 +1866,6 @@ interface BackendMulbyAi {
     ): AiPromiseLike<{ images: string[]; tokens: AiTokenBreakdown }>
     edit(input: { imageAttachmentId: string; prompt: string; model: string }): Promise<{ images: string[]; tokens: AiTokenBreakdown }>
   }
-  }
 }
 
 interface BackendPluginAPIDirect {
@@ -1888,6 +1931,10 @@ interface BackendPluginAPIDirect {
     capture(options?: any): Promise<Uint8Array>
     captureRegion(region: { x: number; y: number; width: number; height: number }, options?: any): Promise<Uint8Array>
     getMediaStreamConstraints(options: any): Promise<any>
+    screenToDipPoint(point: { x: number; y: number }): { x: number; y: number }
+    dipToScreenPoint(point: { x: number; y: number }): { x: number; y: number }
+    screenToDipRect(rect: { x: number; y: number; width: number; height: number }): { x: number; y: number; width: number; height: number }
+    dipToScreenRect(rect: { x: number; y: number; width: number; height: number }): { x: number; y: number; width: number; height: number }
   }
   shell: {
     openPath(path: string): Promise<string>
@@ -2009,6 +2056,8 @@ interface BackendPluginAPIDirect {
     removeFeature(code: string): boolean
     redirectHotKeySetting(cmdLabel: string, autocopy?: boolean): void
     redirectAiModelsSetting(): void
+    onMainPush(callback: (action: { code: string; type: string; payload: string }) => MainPushItem[] | Promise<MainPushItem[]>): void
+    onMainPushSelect(callback: (action: { code: string; type: string; payload: string; option: MainPushItem }) => boolean | Promise<boolean>): void
   }
   messaging: BackendMessaging
   ai: BackendMulbyAi
