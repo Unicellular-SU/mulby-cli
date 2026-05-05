@@ -8,6 +8,10 @@ export function buildBasicManifest(name: string) {
     description: 'Plugin description',
     main: 'dist/main.js',
     icon: 'icon.png',
+    permissions: {
+      clipboard: true,
+      notification: true
+    },
     features: [
       {
         code: 'main',

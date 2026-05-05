@@ -53,9 +53,17 @@ interface InputAttachment {
   capture?: InputAttachmentCaptureInfo
 }
 
+interface ActiveWindowInfo {
+  app: string
+  title: string
+  pid?: number
+  bundleId?: string
+}
+
 interface InputPayload {
   text: string
   attachments: InputAttachment[]
+  activeWindow?: ActiveWindowInfo
 }
 
 interface ClipboardFileInfo {
@@ -89,7 +97,7 @@ interface MulbyInput {
 }
 
 interface MulbyNotification {
-  show(message: string, type?: 'info' | 'success' | 'warning' | 'error'): void
+  show(message: string, type?: 'info' | 'success' | 'warning' | 'error'): Promise<void>
 }
 
 interface BrowserWindowProxy {
@@ -106,6 +114,7 @@ interface BrowserWindowProxy {
   setBounds(bounds: { x?: number; y?: number; width?: number; height?: number }): Promise<boolean>
   getBounds(): Promise<{ x: number; y: number; width: number; height: number }>
   setOpacity(opacity: number): Promise<void>
+  setBackgroundThrottling(allowed: boolean): Promise<boolean>
   setIgnoreMouseEvents(ignore: boolean, options?: { forward?: boolean }): Promise<void>
   setAlwaysOnTop(flag: boolean, level?: string): Promise<void>
   setVisibleOnAllWorkspaces(flag: boolean, options?: { visibleOnFullScreen?: boolean }): Promise<void>
@@ -117,6 +126,7 @@ interface MulbyWindow {
   invalidate(): void
   hide(isRestorePreWindow?: boolean): void
   show(): void
+  focus(): void
   setSize(width: number, height: number): void
   setPosition(x: number, y: number): void
   setBounds(bounds: { x?: number; y?: number; width?: number; height?: number }): Promise<boolean>
@@ -141,15 +151,15 @@ interface MulbyWindow {
     x?: number; y?: number;
     minWidth?: number; minHeight?: number;
     maxWidth?: number; maxHeight?: number;
+    inheritWindowSizeLimits?: boolean;
     opacity?: number;
     transparent?: boolean;
+    backgroundThrottling?: boolean;
     visibleOnAllWorkspaces?: boolean;
     visibleOnFullScreen?: boolean;
     ignoreMouseEvents?: boolean;
     forwardMouseEvents?: boolean;
-    position?: 'default' | 'capture-region';
-    fit?: 'default' | 'capture-region' | 'capture-region-with-toolbar';
-    captureToolbarHeight?: number;
+    params?: Record<string, string>;
   }): Promise<BrowserWindowProxy | null>
   close(): void
   terminatePlugin(): Promise<{ success: boolean; error?: string }>
@@ -158,6 +168,7 @@ interface MulbyWindow {
   setAlwaysOnTop(flag: boolean): void
   setOpacity(opacity: number): Promise<void>
   getOpacity(): Promise<number>
+  setBackgroundThrottling(allowed: boolean): Promise<boolean>
   getMode(): Promise<'attached' | 'detached'>
   getWindowType(): Promise<'main' | 'detach'>
   minimize(): void
@@ -323,8 +334,13 @@ interface PluginInfo {
     maxWidth?: number
     maxHeight?: number
     alwaysOnTop?: boolean
+    focusable?: boolean
     opacity?: number
     transparent?: boolean
+    visibleOnAllWorkspaces?: boolean
+    visibleOnFullScreen?: boolean
+    skipTaskbar?: boolean
+    backgroundThrottling?: boolean
     position?: 'default' | 'capture-region'
     fit?: 'default' | 'capture-region' | 'capture-region-with-toolbar'
     captureToolbarHeight?: number
@@ -340,6 +356,9 @@ interface PluginInfo {
     mode?: 'ui' | 'silent' | 'detached'
     route?: string
     icon?: ResolvedIcon
+    mainPush?: boolean
+    mainHide?: boolean
+    preCapture?: 'region' | 'fullscreen'
   }>
   enabled: boolean
 }
@@ -351,8 +370,13 @@ interface PluginSearchResult {
   featureCode: string
   featureExplain: string
   featureRoute?: string
-  matchType: 'keyword' | 'regex' | 'files' | 'img' | 'over'
+  matchType: 'keyword' | 'regex' | 'files' | 'img' | 'over' | 'window'
   icon?: ResolvedIcon
+  mainPushItems?: MainPushItem[]
+}
+
+interface PluginRendererCapabilities {
+  webview: boolean
 }
 
 interface BackgroundPluginInfo {
@@ -373,7 +397,7 @@ interface BackgroundPluginInfo {
 
 interface OpenSystemPluginPayload {
   pluginId: string
-  route?: string
+  params?: Record<string, unknown>
 }
 
 interface SystemPluginBeforeAttachPayload {
@@ -389,7 +413,7 @@ interface MulbyApp {
   onOpenAiSkillsSettings(callback: () => void): Disposable
   onOpenAiToolsSettings(callback: () => void): Disposable
   onOpenPluginStore(callback: () => void): Disposable
-  onOpenPluginManager(callback: () => void): Disposable
+  onOpenPluginManager(callback: (pluginId?: string) => void): Disposable
   onOpenBackgroundPlugins(callback: () => void): Disposable
   onOpenTaskScheduler(callback: () => void): Disposable
   onOpenLogViewer(callback: () => void): Disposable
@@ -413,9 +437,10 @@ interface MulbySystemPageState {
 
 interface MulbySystemPage {
   open(payload: {
-    page: 'settings' | 'plugin-manager' | 'plugin-store' | 'background-plugins' | 'task-scheduler' | 'log-viewer' | 'ai-settings' | 'ai-mcp-settings' | 'ai-skills-settings'
-    settingsSection?: 'general' | 'shortcuts' | 'commandQuickLaunch' | 'commandAll' | 'permissions' | 'security' | 'developer' | 'about'
+    page: 'settings' | 'plugin-manager' | 'plugin-store' | 'background-plugins' | 'task-scheduler' | 'log-viewer' | 'storage-explorer' | 'ai-settings' | 'ai-mcp-settings' | 'ai-tools-settings' | 'ai-skills-settings'
+    settingsSection?: 'dashboard' | 'general' | 'superPanel' | 'shortcuts' | 'commandQuickLaunch' | 'commandAll' | 'permissions' | 'security' | 'openclaw' | 'developer' | 'about'
     shortcutCommandHint?: string
+    detailsPluginId?: string
   }): Promise<boolean>
   close(): Promise<boolean>
   detach(): Promise<boolean>
@@ -457,6 +482,8 @@ interface MulbyPlugin {
   getReadme(name: string): Promise<string | null>
   redirect(label: string | [string, string], payload?: unknown): Promise<boolean | { candidates: { name: string; displayName: string }[] }>
   outPlugin(isKill?: boolean): Promise<boolean>
+  mainPushSelect(pluginName: string, action: { code: string; type: string; payload: string; option: MainPushItem }): Promise<boolean>
+  getMainPushPlugins(): Promise<Array<{ pluginId: string; displayName: string }>>
   listBackground(): Promise<BackgroundPluginInfo[]>
   startBackground(pluginId: string): Promise<{ success: boolean; error?: string }>
   stopBackground(pluginId: string): Promise<{ success: boolean }>
@@ -673,6 +700,8 @@ interface MulbyPermission {
   openSystemSettings(type: 'geolocation' | 'camera' | 'microphone' | 'notifications' | 'screen' | 'accessibility' | 'contacts' | 'calendar'): Promise<boolean>
   isAccessibilityTrusted(): Promise<boolean>
 }
+
+type BackendPermissionType = 'geolocation' | 'camera' | 'microphone' | 'notifications' | 'screen' | 'accessibility' | 'contacts' | 'calendar'
 
 interface MulbyShortcut {
   register(accelerator: string): Promise<boolean>
@@ -918,7 +947,7 @@ interface StartupOpenAtLoginState {
   enabled: boolean
 }
 
-type UpdateCenterStatus = 'idle' | 'checking' | 'up-to-date' | 'update-available' | 'error'
+type UpdateCenterStatus = 'idle' | 'checking' | 'up-to-date' | 'update-available' | 'downloading' | 'downloaded' | 'error'
 
 interface UpdateCenterState {
   status: UpdateCenterStatus
@@ -932,6 +961,12 @@ interface UpdateCenterState {
   releaseNotes?: string
   message?: string
   lastCheckedAt?: number
+  downloadProgress?: {
+    bytesPerSecond: number
+    percent: number
+    transferred: number
+    total: number
+  }
 }
 
 interface MulbySettings {
@@ -947,10 +982,10 @@ interface MulbySettings {
   getUpdateCenterState(): Promise<UpdateCenterState>
   checkAppUpdates(): Promise<UpdateCenterState>
   openUpdateReleasePage(): Promise<boolean>
-  downloadUpdate(): Promise<unknown>
-  installUpdate(): Promise<unknown>
-  onUpdateStateChanged(callback: (state: unknown) => void): Disposable
-  onShortcutStatusChanged(callback: (status: unknown) => void): Disposable
+  downloadUpdate(): Promise<UpdateCenterState>
+  installUpdate(): Promise<boolean>
+  onUpdateStateChanged(callback: (state: UpdateCenterState) => void): Disposable
+  onShortcutStatusChanged(callback: (status: ShortcutStatusMap) => void): Disposable
 }
 
 interface MulbyDeveloper {
@@ -1574,9 +1609,13 @@ interface PluginInitData {
   pluginName: string
   featureCode: string
   input: string
-  mode?: string
-  route?: string
   attachments?: Attachment[]
+  mode?: string
+  capabilities?: PluginRendererCapabilities
+  nonce?: number
+  route?: string
+  params?: Record<string, string>
+  windowType?: string
 }
 
 interface PluginLaunchStartEvent {
@@ -1688,6 +1727,7 @@ interface MulbyAPI {
     input: string
     attachments?: Attachment[]
     mode: 'panel'
+    launchRequestId?: string
   }) => void): Disposable
   onPluginDetached(callback: () => void): Disposable
   onPluginOut(callback: (isKill: boolean) => void): Disposable
@@ -1812,8 +1852,6 @@ interface BackendMessaging {
   }) => void | Promise<void>): void
 }
 
-type BackendPermissionType = 'geolocation' | 'camera' | 'microphone' | 'notifications' | 'screen' | 'accessibility' | 'contacts' | 'calendar'
-
 interface BackendScheduler {
   schedule(task: {
     name: string
@@ -1931,10 +1969,6 @@ interface BackendPluginAPIDirect {
     capture(options?: any): Promise<Uint8Array>
     captureRegion(region: { x: number; y: number; width: number; height: number }, options?: any): Promise<Uint8Array>
     getMediaStreamConstraints(options: any): Promise<any>
-    screenToDipPoint(point: { x: number; y: number }): { x: number; y: number }
-    dipToScreenPoint(point: { x: number; y: number }): { x: number; y: number }
-    screenToDipRect(rect: { x: number; y: number; width: number; height: number }): { x: number; y: number; width: number; height: number }
-    dipToScreenRect(rect: { x: number; y: number; width: number; height: number }): { x: number; y: number; width: number; height: number }
   }
   shell: {
     openPath(path: string): Promise<string>

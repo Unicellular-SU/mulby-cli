@@ -18,6 +18,10 @@ export function buildReactManifest(name: string) {
     main: 'dist/main.js',
     ui: 'ui/index.html',
     icon: 'icon.png',
+    permissions: {
+      clipboard: true,
+      notification: true
+    },
     window: {
       width: 800,       // 默认宽度
       height: 600,      // 默认高度
