@@ -506,12 +506,20 @@ interface DisplayInfo {
   isPrimary: boolean
 }
 
+interface CaptureBounds {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
 interface CaptureSource {
   id: string
   name: string
   thumbnailDataUrl: string
   displayId?: string
   appIconDataUrl?: string
+  bounds?: CaptureBounds
 }
 
 interface ColorPickResult {
@@ -529,6 +537,7 @@ interface MulbyScreen {
   getDisplayMatching(rect: { x: number; y: number; width: number; height: number }): Promise<DisplayInfo>
   getCursorScreenPoint(): Promise<{ x: number; y: number }>
   getSources(options?: { types?: ('screen' | 'window')[]; thumbnailSize?: { width: number; height: number } }): Promise<CaptureSource[]>
+  getWindowBounds(sourceId: string): Promise<CaptureBounds | null>
   capture(options?: { sourceId?: string; format?: 'png' | 'jpeg'; quality?: number }): Promise<ArrayBuffer>
   captureRegion(region: { x: number; y: number; width: number; height: number }, options?: { format?: 'png' | 'jpeg'; quality?: number }): Promise<ArrayBuffer>
   getMediaStreamConstraints(options: { sourceId: string; audio?: boolean; frameRate?: number }): Promise<object>
@@ -1966,6 +1975,7 @@ interface BackendPluginAPIDirect {
     getDisplayNearestPoint(point: { x: number; y: number }): Promise<any>
     getCursorScreenPoint(): Promise<{ x: number; y: number }>
     getSources(options?: any): Promise<any[]>
+    getWindowBounds(sourceId: string): Promise<any>
     capture(options?: any): Promise<Uint8Array>
     captureRegion(region: { x: number; y: number; width: number; height: number }, options?: any): Promise<Uint8Array>
     getMediaStreamConstraints(options: any): Promise<any>
