@@ -142,7 +142,15 @@ my-plugin/
 - `ui`: React 或其他前端界面入口，例如 `ui/index.html`
 - `type`: 插件类型，例如 `utility`、`developer`、`ai`
 - `pluginSetting`: 插件窗口行为，例如 `single`、`height`
-- `window`: 独立窗口尺寸配置
+- `window`: 独立窗口尺寸和窗口行为配置，例如 `type`、`width`、`height`、`alwaysOnTop`、`skipTaskbar`
+
+### macOS Dock 行为
+
+`mode: "detached"` 的插件窗口在 macOS 上由 Mulby 的应用级 Dock 图标表示。存在插件独立窗口时，宿主会优先显示“Mulby 图标 + 最近聚焦插件图标”的组合样式，多窗口时显示数量徽标。
+
+Dock 右键菜单会提供插件窗口切换、关闭插件窗口、打开 Mulby 和退出 Mulby 等操作。系统 Dock 的“退出”仍然退出宿主应用；只关闭插件应使用插件窗口菜单或插件 UI 内的关闭能力。
+
+`skipTaskbar` 只表示请求隐藏具体窗口的任务栏/Dock 呈现，不能保证隐藏 Mulby 应用级 Dock 图标。
 
 ## AI 开发与内置 Skill
 

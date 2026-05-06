@@ -33,6 +33,9 @@ export function buildReactManifest(name: string) {
       // 截图标注类 detached 插件可额外使用：
       // transparent: true,
       // alwaysOnTop: true,
+      // visibleOnAllWorkspaces: true,
+      // visibleOnFullScreen: true,
+      // skipTaskbar: true, // macOS 仍可能显示 Mulby 应用级 Dock 图标
       // position: 'capture-region',
       // fit: 'capture-region-with-toolbar',
       // captureToolbarHeight: 56

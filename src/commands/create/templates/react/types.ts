@@ -146,7 +146,7 @@ interface MulbyWindow {
     maximizable?: boolean;
     fullscreenable?: boolean;
     focusable?: boolean;
-    skipTaskbar?: boolean;
+    skipTaskbar?: boolean; // 请求不出现在 Dock/任务栏；macOS 仍可能显示 Mulby 应用级 Dock 图标
     enableLargerThanScreen?: boolean;
     x?: number; y?: number;
     minWidth?: number; minHeight?: number;
@@ -339,7 +339,7 @@ interface PluginInfo {
     transparent?: boolean
     visibleOnAllWorkspaces?: boolean
     visibleOnFullScreen?: boolean
-    skipTaskbar?: boolean
+    skipTaskbar?: boolean // 请求不出现在 Dock/任务栏；macOS 仍可能显示 Mulby 应用级 Dock 图标
     backgroundThrottling?: boolean
     position?: 'default' | 'capture-region'
     fit?: 'default' | 'capture-region' | 'capture-region-with-toolbar'

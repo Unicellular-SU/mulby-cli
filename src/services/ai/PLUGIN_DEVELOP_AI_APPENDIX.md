@@ -27,6 +27,8 @@ When modifying an existing plugin or a freshly scaffolded plugin, do this in ord
 - Every trigger in `cmds` must be intentional and testable.
 - Keep UI, backend, and preload responsibilities explicit.
 - Add `preload.cjs` only when Node.js or Electron bridging is required.
+- For detached UI on macOS, remember that Mulby shows an app-level Dock icon while detached plugin windows exist. The Dock icon may be composed from the host icon and the most recently focused plugin icon, with a count badge for multiple plugin windows.
+- Do not describe `skipTaskbar` as a way to hide Mulby's macOS app Dock icon. It only requests hiding an individual window's taskbar/Dock representation where the platform supports it.
 
 ### Validation Rules
 

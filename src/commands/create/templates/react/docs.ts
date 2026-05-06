@@ -25,6 +25,10 @@ export function buildReactReadme(name: string) {
 
 React 模板适合可视化插件。需要独立窗口时，将功能配置为 \`mode: "detached"\`；需要截图后打开标注界面时，可组合 \`preCapture: "region"\` 和窗口配置 \`type: "borderless"\`、\`transparent: true\`、\`position: "capture-region"\`、\`fit: "capture-region-with-toolbar"\`。
 
+macOS 上，独立插件窗口会使用 Mulby 的应用级 Dock 图标表示。Dock 图标会优先显示“宿主图标 + 最近聚焦插件图标”的组合样式，多窗口时显示数量徽标。Dock 右键菜单可用于切换或关闭插件窗口；系统 Dock 的“退出”仍然退出宿主应用。
+
+\`skipTaskbar\` 只表示请求隐藏具体窗口的任务栏/Dock 呈现，不能作为隐藏 Mulby 应用级 Dock 图标的开关。
+
 ## 开发
 
 > **💡 提示**: 推荐使用 [pnpm](https://pnpm.io/) 进行依赖管理。若插件放置于基于 pnpm workspace 的父仓库（如 \`plugins/<name>/\` 目录），通常建议直接在**仓库根目录**执行一次 \`pnpm install\`。也可以在当前插件目录单独执行。

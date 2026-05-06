@@ -616,7 +616,7 @@ export class AIAgent {
                 errors.push('manifest.json 必须包含至少一个 features 项。');
             } else {
                 const seenCodes = new Set<string>();
-                const allowedCommandTypes = new Set(['keyword', 'regex', 'files', 'img', 'over']);
+                const allowedCommandTypes = new Set(['keyword', 'regex', 'files', 'img', 'over', 'window']);
 
                 manifest.features.forEach((feature: any, index: number) => {
                     const prefix = `features[${index}]`;
