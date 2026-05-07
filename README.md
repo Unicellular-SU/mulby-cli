@@ -140,9 +140,41 @@ my-plugin/
 常见字段：
 
 - `ui`: React 或其他前端界面入口，例如 `ui/index.html`
+- `preload`: 可选 CommonJS preload，例如 `preload.cjs`。当插件 UI 需要 Node.js、Electron 桥接、原生模块或外部二进制时使用
+- `assets`: 打包白名单。额外 HTML、子窗口 preload、`.node` 原生模块、外部二进制、语言包等运行资源需要列入
 - `type`: 插件类型，例如 `utility`、`developer`、`ai`
 - `pluginSetting`: 插件窗口行为，例如 `single`、`height`
 - `window`: 独立窗口尺寸和窗口行为配置，例如 `type`、`width`、`height`、`alwaysOnTop`、`skipTaskbar`
+
+### 旧插件兼容窗口
+
+新插件推荐使用单入口 UI 和前端路由。迁移 zTools/uTools 风格插件时，如果旧插件由多个 HTML 页面组成，可以显式使用文件窗口模式：
+
+```js
+const child = await window.mulby.window.create('region/index.html?key=abc', {
+  loadMode: 'file',
+  preload: 'region/preload.cjs',
+  width: 640,
+  height: 480
+})
+```
+
+文件窗口只能加载插件目录内的相对 `.html` / `.htm` 文件；`preload` 只能指向插件目录内的 `.js` / `.cjs` 文件。未指定窗口 preload 时会回退到 `manifest.preload`。
+
+使用 `mulby pack` 时，把这些额外资源写入 `manifest.assets`：
+
+```json
+{
+  "assets": [
+    "region",
+    "effect",
+    "countdown.html",
+    "region/preload.cjs",
+    "addon-darwin-arm64.node",
+    "bin/aperture"
+  ]
+}
+```
 
 ### macOS Dock 行为
 
@@ -201,6 +233,7 @@ pnpm run pack
 - 包内 `manifest.json` 会把 `main` 改写为包内实际入口 `main.js`
 - 插件根目录下的 `icon.png` 会被一起打进包里
 - 如果是 React 插件，确保 `ui/` 构建产物已经生成
+- 除默认入口外的额外 HTML、preload、原生模块和二进制资源需要通过 `manifest.assets` 显式打包
 
 ## 深度文档在哪里
 
@@ -230,7 +263,9 @@ README 只保留高频入口。更完整的 Mulby 插件开发知识已经放进
 
 ### `mulby pack` 会打包后端依赖吗？
 
-会。`mulby pack` 会分析 `dist/main.js` 和 `preload.cjs` 的运行时依赖，并把需要的 `node_modules` 文件一起写入 `.inplugin`。这包括 `sharp` 这类 native addon 依赖的 `.node` 和平台库文件。
+会。`mulby pack` 会分析 `dist/main.js` 和 `manifest.preload` 的运行时依赖，并把需要的 `node_modules` 文件一起写入 `.inplugin`。这包括 `sharp` 这类 native addon 依赖的 `.node` 和平台库文件。
+
+但静态分析无法知道运行时按字符串路径加载的资源。额外 HTML、子窗口 preload、独立 `.node` 文件和外部二进制请写入 `manifest.assets`。
 
 ### 还可以查看更完整的命令帮助吗？
 

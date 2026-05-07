@@ -29,6 +29,34 @@ macOS 上，独立插件窗口会使用 Mulby 的应用级 Dock 图标表示。D
 
 \`skipTaskbar\` 只表示请求隐藏具体窗口的任务栏/Dock 呈现，不能作为隐藏 Mulby 应用级 Dock 图标的开关。
 
+## 旧插件兼容窗口
+
+新插件优先使用单入口 UI + 前端路由。迁移 zTools/uTools 风格插件时，如果必须打开不同 HTML 文件并为窗口指定独立 preload，可以使用 \`window.mulby.window.create(path, { loadMode: "file" })\`。
+
+\`\`\`ts
+const regionWindow = await window.mulby.window.create('region/index.html?key=abc', {
+  loadMode: 'file',
+  preload: 'region/preload.cjs',
+  width: 640,
+  height: 480
+})
+\`\`\`
+
+文件模式只允许加载插件目录内的相对 HTML 文件，\`preload\` 只允许插件目录内的 \`.js\` / \`.cjs\` 文件。额外 HTML、窗口专属 preload、\`.node\` 原生模块和外部二进制不会自动进入包内，需要写入 \`manifest.assets\`：
+
+\`\`\`json
+{
+  "assets": [
+    "region",
+    "effect",
+    "countdown.html",
+    "region/preload.cjs",
+    "addon-darwin-arm64.node",
+    "bin/aperture"
+  ]
+}
+\`\`\`
+
 ## 开发
 
 > **💡 提示**: 推荐使用 [pnpm](https://pnpm.io/) 进行依赖管理。若插件放置于基于 pnpm workspace 的父仓库（如 \`plugins/<name>/\` 目录），通常建议直接在**仓库根目录**执行一次 \`pnpm install\`。也可以在当前插件目录单独执行。
@@ -65,17 +93,19 @@ ${name}/
 ├── package.json
 ├── src/
 │   ├── main.ts                # 后端入口
+│   ├── types/
+│   │   └── mulby.d.ts         # 类型定义（含 BackendPluginContext）
 │   ├── ui/
 │   │   ├── App.tsx            # 主应用
 │   │   ├── main.tsx           # UI 入口
 │   │   ├── index.html         # HTML 模板
 │   │   ├── styles.css         # 全局样式
 │   │   ├── hooks/
-│   │   │   └── useMulby.ts  # Mulby API Hook
-│   └── types/
-│       └── mulby.d.ts       # 类型定义（含 BackendPluginContext）
+│   │   │   └── useMulby.ts    # Mulby API Hook
+│   ├── legacy/                # 可选：旧插件兼容 HTML/preload 源文件
 ├── dist/                      # 后端构建输出
 ├── ui/                        # UI 构建输出
+├── assets/                    # 可选：manifest.assets 打包资源
 └── icon.png                   # 插件图标
 \`\`\`
 

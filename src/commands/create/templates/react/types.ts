@@ -126,7 +126,9 @@ interface MulbyWindow {
   invalidate(): void
   hide(isRestorePreWindow?: boolean): void
   show(): void
+  showInactive(): void
   focus(): void
+  setTitle(title: string): void
   setSize(width: number, height: number): void
   setPosition(x: number, y: number): void
   setBounds(bounds: { x?: number; y?: number; width?: number; height?: number }): Promise<boolean>
@@ -135,6 +137,8 @@ interface MulbyWindow {
   center(): void
   create(url: string, options?: {
     width?: number; height?: number; title?: string;
+    loadMode?: 'route' | 'file';
+    preload?: string;
     type?: 'default' | 'borderless' | 'fullscreen';
     titleBar?: boolean;
     fullscreen?: boolean;
@@ -165,10 +169,13 @@ interface MulbyWindow {
   terminatePlugin(): Promise<{ success: boolean; error?: string }>
   showPluginMenu(point?: { x: number; y: number }): Promise<boolean>
   detach(): void
-  setAlwaysOnTop(flag: boolean): void
+  setAlwaysOnTop(flag: boolean, level?: string): void
   setOpacity(opacity: number): Promise<void>
   getOpacity(): Promise<number>
   setBackgroundThrottling(allowed: boolean): Promise<boolean>
+  setIgnoreMouseEvents(ignore: boolean, options?: { forward?: boolean }): void
+  setVisibleOnAllWorkspaces(flag: boolean, options?: { visibleOnFullScreen?: boolean }): void
+  setFullScreen(flag: boolean): void
   getMode(): Promise<'attached' | 'detached'>
   getWindowType(): Promise<'main' | 'detach'>
   minimize(): void
@@ -339,6 +346,8 @@ interface PluginInfo {
     transparent?: boolean
     visibleOnAllWorkspaces?: boolean
     visibleOnFullScreen?: boolean
+    ignoreMouseEvents?: boolean
+    forwardMouseEvents?: boolean
     skipTaskbar?: boolean // 请求不出现在 Dock/任务栏；macOS 仍可能显示 Mulby 应用级 Dock 图标
     backgroundThrottling?: boolean
     position?: 'default' | 'capture-region'

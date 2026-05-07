@@ -125,6 +125,26 @@ pnpm run build
 pnpm run pack
 \`\`\`
 
+## Packaging extra resources
+
+The CLI automatically packages \`dist/main.js\`, \`icon.png\`, \`ui/\` when present, and \`manifest.preload\` when configured. Extra runtime files must be listed in \`manifest.assets\`.
+
+Use \`assets\` for additional HTML files, child-window preload files, native \`.node\` addons, external binaries, locale files, or any resource loaded by path at runtime:
+
+\`\`\`json
+{
+  "assets": [
+    "region",
+    "countdown.html",
+    "region/preload.cjs",
+    "addon-darwin-arm64.node",
+    "bin/tool"
+  ]
+}
+\`\`\`
+
+When migrating zTools/uTools-style plugins, child windows can load plugin-local HTML files with \`window.mulby.window.create(path, { loadMode: "file", preload })\`. New plugins should usually prefer a single \`ui/index.html\` entry and frontend routing.
+
 ## Project structure
 
 \`\`\`
