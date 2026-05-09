@@ -2024,6 +2024,8 @@ interface BackendPluginAPIDirect {
     isWindows(): boolean
     isLinux(): boolean
     onActiveWindowChange(callback: (info: { app: string; title: string; pid?: number; bundleId?: string }) => void): () => void
+    getCachedActiveWindow(): ActiveWindowInfo | null
+    getActiveWindow(): Promise<ActiveWindowInfo | null>
   }
   shortcut: {
     register(accelerator: string, callback: () => void): boolean
