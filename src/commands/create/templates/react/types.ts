@@ -148,7 +148,7 @@ interface MulbyWindow {
     movable?: boolean;
     minimizable?: boolean;
     maximizable?: boolean;
-    fullscreenable?: boolean;
+    fullscreenable?: boolean; // 默认 true；子窗口默认可全屏
     focusable?: boolean;
     skipTaskbar?: boolean; // 请求不出现在 Dock/任务栏；macOS 仍可能显示 Mulby 应用级 Dock 图标
     enableLargerThanScreen?: boolean;
@@ -191,6 +191,7 @@ interface MulbyWindow {
   }): void
   reload(): void
   sendToParent(channel: string, ...args: unknown[]): void
+  /** 监听子窗口消息。内置事件 'child-window-closed' 在子窗口关闭时自动推送，payload: { id, pluginId, featureCode, at } */
   onChildMessage(callback: (channel: string, ...args: unknown[]) => void): Disposable
   findInPage(text: string, options?: { forward?: boolean; findNext?: boolean; matchCase?: boolean }): Promise<number>
   stopFindInPage(action?: 'clearSelection' | 'keepSelection' | 'activateSelection'): void
