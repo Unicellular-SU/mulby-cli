@@ -46,19 +46,19 @@ export function buildBasicMain(name: string) {
 declare const mulby: any
 
 export function onLoad() {
-  console.log('[${name}] plugin loaded')
+  // Register background subscriptions or plugin tools here when needed.
 }
 
 export function onUnload() {
-  console.log('[${name}] plugin unloaded')
+  // Clean up subscriptions, timers, or external resources here.
 }
 
 export function onEnable() {
-  console.log('[${name}] plugin enabled')
+  // Called when the plugin is enabled.
 }
 
 export function onDisable() {
-  console.log('[${name}] plugin disabled')
+  // Called when the plugin is disabled.
 }
 
 export async function run(context: BackendPluginContext) {
@@ -96,6 +96,38 @@ Plugin description
 ## Trigger
 
 - \`${name}\` - main feature
+
+## Messaging subscriptions
+
+For plugin-to-plugin messaging, keep subscriptions in the backend and expose cached data to the UI through \`rpc\` methods. If the plugin must receive messages while no UI is open, set \`manifest.pluginSetting.background = true\` and register the same handler from \`onBackground(context)\`.
+
+\`\`\`ts
+let messageHandler: ((message: PluginMessage) => void | Promise<void>) | null = null
+const recentMessages: PluginMessage[] = []
+
+function registerMessaging(api: BackendPluginAPI) {
+  if (messageHandler) api.messaging.off(messageHandler)
+  messageHandler = (message) => {
+    recentMessages.unshift(message)
+    recentMessages.splice(50)
+  }
+  api.messaging.on(messageHandler)
+}
+
+export function onLoad(context?: BackendPluginContext) {
+  if (context) registerMessaging(context.api)
+}
+
+export function onBackground(context?: BackendPluginContext) {
+  if (context) registerMessaging(context.api)
+}
+
+export const rpc = {
+  getRecentMessages() {
+    return recentMessages
+  }
+}
+\`\`\`
 
 ## Development
 

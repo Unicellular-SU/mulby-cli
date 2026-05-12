@@ -21,6 +21,50 @@ export function buildReactReadme(name: string) {
 
 - \`${name}\` - 主功能
 
+## 插件通信
+
+后端可以使用 \`context.api.messaging\` 或全局 \`mulby.messaging\` 与其他插件通信。需要长期接收消息时，把订阅注册在后端，并让 UI 通过 \`window.mulby.host.call(...)\` 读取后端缓存；不要把消息缓存只放在前端。
+
+\`\`\`ts
+let messageHandler: ((message: PluginMessage) => void | Promise<void>) | null = null
+const recentMessages: PluginMessage[] = []
+
+function registerMessaging(api: BackendPluginAPI) {
+  if (messageHandler) api.messaging.off(messageHandler)
+  messageHandler = (message) => {
+    recentMessages.unshift(message)
+    recentMessages.splice(50)
+  }
+  api.messaging.on(messageHandler)
+}
+
+export function onLoad(context?: BackendPluginContext) {
+  if (context) registerMessaging(context.api)
+}
+
+export function onBackground(context?: BackendPluginContext) {
+  if (context) registerMessaging(context.api)
+}
+
+export const rpc = {
+  getRecentMessages() {
+    return recentMessages
+  }
+}
+\`\`\`
+
+如果插件没有打开 UI 时也要接收消息，在 \`manifest.json\` 中启用后台运行：
+
+\`\`\`json
+{
+  "pluginSetting": {
+    "background": true,
+    "persistent": true,
+    "idleTimeoutMs": "never"
+  }
+}
+\`\`\`
+
 ## 窗口与截图
 
 React 模板适合可视化插件。需要独立窗口时，将功能配置为 \`mode: "detached"\`；需要截图后打开标注界面时，可组合 \`preCapture: "region"\` 和窗口配置 \`type: "borderless"\`、\`transparent: true\`、\`position: "capture-region"\`、\`fit: "capture-region-with-toolbar"\`。

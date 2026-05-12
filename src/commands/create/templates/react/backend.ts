@@ -12,19 +12,19 @@ export function buildBackendMain(name: string) {
 declare const mulby: any
 
 export function onLoad() {
-  console.log('[${name}] 插件已加载')
+  // Register background subscriptions or plugin tools here when needed.
 }
 
 export function onUnload() {
-  console.log('[${name}] 插件已卸载')
+  // Clean up subscriptions, timers, or external resources here.
 }
 
 export function onEnable() {
-  console.log('[${name}] 插件已启用')
+  // Called when the plugin is enabled.
 }
 
 export function onDisable() {
-  console.log('[${name}] 插件已禁用')
+  // Called when the plugin is disabled.
 }
 
 // run 是插件入口，context 由宿主注入（包含 featureCode / input / attachments / api）
@@ -69,6 +69,23 @@ export const rpc = {
 //     // args 对应 manifest.tools[].inputSchema 定义的参数
 //     return { result: '处理结果' }
 //   })
+// }
+//
+// --- Messaging subscriptions ---
+// 如果需要接收其他插件消息，把订阅保持在后端，并通过 rpc 暴露缓存给 UI。
+// 若没有 UI 时也要接收消息，请在 manifest.pluginSetting 中启用 background/persistent，
+// 并在 onBackground(context) 中调用同一个 registerMessaging(context.api)。
+//
+// let messageHandler: ((message: PluginMessage) => void | Promise<void>) | null = null
+// const recentMessages: PluginMessage[] = []
+//
+// function registerMessaging(api: BackendPluginAPI) {
+//   if (messageHandler) api.messaging.off(messageHandler)
+//   messageHandler = (message) => {
+//     recentMessages.unshift(message)
+//     recentMessages.splice(50)
+//   }
+//   api.messaging.on(messageHandler)
 // }
 
 const plugin = { onLoad, onUnload, onEnable, onDisable, run, rpc }

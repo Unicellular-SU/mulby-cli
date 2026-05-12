@@ -415,6 +415,10 @@ interface SystemPluginBeforeAttachPayload {
   pluginId: string
 }
 
+interface MainWindowShowEvent {
+  autoPasteScheduled: boolean
+}
+
 interface MulbyApp {
   onOpenSystemPlugin(callback: (payload: OpenSystemPluginPayload) => void): Disposable
   onSystemPluginBeforeAttach(callback: (payload: SystemPluginBeforeAttachPayload) => void | Promise<void>): Disposable
@@ -430,6 +434,7 @@ interface MulbyApp {
   onOpenStorageExplorer(callback: () => void): Disposable
   onOpenCommandShortcuts(callback: (payload?: { cmdLabel?: string }) => void): Disposable
   onSetSearchText(callback: (text: string) => void): Disposable
+  onMainWindowShow(callback: (event: MainWindowShowEvent) => void): Disposable
 }
 
 interface MulbySystemPlugin {
@@ -1850,25 +1855,20 @@ interface BackendClipboardHistory {
   stats(): Promise<BackendClipboardHistoryStats>
 }
 
+interface PluginMessage {
+  id: string
+  from: string
+  to?: string
+  type: string
+  payload: unknown
+  timestamp: number
+}
+
 interface BackendMessaging {
   send(targetPluginId: string, type: string, payload: unknown): Promise<void>
   broadcast(type: string, payload: unknown): Promise<void>
-  on(handler: (message: {
-    id: string
-    from: string
-    to?: string
-    type: string
-    payload: unknown
-    timestamp: number
-  }) => void | Promise<void>): void
-  off(handler: (message: {
-    id: string
-    from: string
-    to?: string
-    type: string
-    payload: unknown
-    timestamp: number
-  }) => void | Promise<void>): void
+  on(handler: (message: PluginMessage) => void | Promise<void>): void
+  off(handler?: (message: PluginMessage) => void | Promise<void>): void
 }
 
 interface BackendScheduler {
