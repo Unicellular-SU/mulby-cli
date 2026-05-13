@@ -74,7 +74,7 @@ export const rpc = {
 // --- Messaging subscriptions ---
 // 如果需要接收其他插件消息，把订阅保持在后端，并通过 rpc 暴露缓存给 UI。
 // 若没有 UI 时也要接收消息，请在 manifest.pluginSetting 中启用 background。
-// 是否跟随 Mulby 启动由用户在插件窗口菜单中勾选；如果需要重启恢复，请启用 persistent。
+// 是否跟随 Mulby 启动由用户在插件窗口菜单或搜索结果右键菜单中勾选；如果需要重启恢复，请启用 persistent。
 // 并在 onBackground(context) 中调用同一个 registerMessaging(context.api)。
 //
 // let messageHandler: ((message: PluginMessage) => void | Promise<void>) | null = null

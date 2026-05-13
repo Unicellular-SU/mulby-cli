@@ -146,6 +146,8 @@ my-plugin/
 - `pluginSetting`: 插件运行行为，例如 `single`、`defaultDetached`、`background`、`persistent`、`height`
 - `window`: 独立窗口尺寸和窗口行为配置，例如 `type`、`width`、`height`、`alwaysOnTop`、`skipTaskbar`
 
+`background` 只声明插件支持后台运行，不会让插件自动跟随 Mulby 启动；跟随启动和“始终以独立窗口运行”由用户在 Mulby 的插件菜单或搜索结果右键菜单中勾选。
+
 ### 旧插件兼容窗口
 
 新插件推荐使用单入口 UI 和前端路由。迁移 zTools/uTools 风格插件时，如果旧插件由多个 HTML 页面组成，可以显式使用文件窗口模式：

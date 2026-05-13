@@ -99,7 +99,7 @@ Plugin description
 
 ## Messaging subscriptions
 
-For plugin-to-plugin messaging, keep subscriptions in the backend and expose cached data to the UI through \`rpc\` methods. If the plugin must receive messages while no UI is open, set \`manifest.pluginSetting.background = true\` and register the same handler from \`onBackground(context)\`. Whether it follows Mulby startup is controlled by the user from the plugin window menu.
+For plugin-to-plugin messaging, keep subscriptions in the backend and expose cached data to the UI through \`rpc\` methods. If the plugin must receive messages while no UI is open, set \`manifest.pluginSetting.background = true\` and register the same handler from \`onBackground(context)\`. Whether it follows Mulby startup is controlled by the user from the plugin window menu or the search-result context menu.
 
 \`\`\`ts
 let messageHandler: ((message: PluginMessage) => void | Promise<void>) | null = null

@@ -380,9 +380,25 @@ interface PluginSearchResult {
   featureCode: string
   featureExplain: string
   featureRoute?: string
+  hasUI?: boolean
+  featureMode?: 'ui' | 'silent' | 'detached'
   matchType: 'keyword' | 'regex' | 'files' | 'img' | 'over' | 'window'
   icon?: ResolvedIcon
   mainPushItems?: MainPushItem[]
+}
+
+type PluginLaunchMode = 'normal' | 'attached' | 'detached'
+
+interface PluginLaunchOnStartupState {
+  enabled: boolean
+  featureCode: string
+  mode: PluginLaunchMode
+  updatedAt: number
+}
+
+interface PluginAlwaysOpenDetachedState {
+  enabled: boolean
+  updatedAt: number
 }
 
 interface PluginRendererCapabilities {
@@ -480,6 +496,17 @@ interface MulbyPlugin {
   hideFeature(pluginId: string, featureCode: string): Promise<{ success: boolean }>
   unhideFeature(pluginId: string, featureCode: string): Promise<{ success: boolean }>
   removeRecentUsage(pluginId: string, featureCode: string): Promise<{ success: boolean }>
+  getLaunchOnStartup(pluginId: string): Promise<PluginLaunchOnStartupState | undefined>
+  setLaunchOnStartup(
+    pluginId: string,
+    enabled: boolean,
+    target?: { featureCode: string; mode?: PluginLaunchMode }
+  ): Promise<{ success: boolean; state?: PluginLaunchOnStartupState; error?: string }>
+  getAlwaysOpenDetached(pluginId: string): Promise<PluginAlwaysOpenDetachedState | undefined>
+  setAlwaysOpenDetached(
+    pluginId: string,
+    enabled: boolean
+  ): Promise<{ success: boolean; state?: PluginAlwaysOpenDetachedState; error?: string }>
   resolveDroppedFilePaths(files: File[]): string[]
   install(filePath: string): Promise<{
     success: boolean
