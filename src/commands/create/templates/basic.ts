@@ -22,6 +22,21 @@ export function buildBasicManifest(name: string) {
   }
 }
 
+export function buildBasicTsConfig() {
+  return {
+    compilerOptions: {
+      target: 'ES2020',
+      module: 'commonjs',
+      strict: true,
+      esModuleInterop: true,
+      skipLibCheck: true,
+      outDir: './dist',
+      rootDir: './src'
+    },
+    include: ['src']
+  }
+}
+
 export function buildBasicPackageJson(name: string) {
   return {
     name,

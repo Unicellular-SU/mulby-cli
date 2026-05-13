@@ -14,6 +14,13 @@ export async function create(name: string, options: any) {
 
   const targetDir = path.resolve(process.cwd(), name)
 
+  // 校验插件名称合法性
+  const NAME_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/
+  if (!NAME_REGEX.test(name)) {
+    console.log(chalk.red('错误: 插件名称只能包含字母、数字、连字符(-)、下划线(_)和点(.)，且必须以字母或数字开头'))
+    process.exit(1)
+  }
+
   if (fs.existsSync(targetDir)) {
     console.log(chalk.red(`错误: 目录 ${name} 已存在`))
     process.exit(1)

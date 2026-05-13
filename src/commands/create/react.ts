@@ -65,8 +65,8 @@ function createViteConfig(targetDir: string) {
 
 function createPostcssConfig(targetDir: string) {
   const config = buildPostcssConfig()
-  fs.writeFileSync(path.join(targetDir, 'postcss.config.js'), config)
-  console.log(chalk.green('  ✓ postcss.config.js'))
+  fs.writeFileSync(path.join(targetDir, 'postcss.config.mjs'), config)
+  console.log(chalk.green('  ✓ postcss.config.mjs'))
 }
 
 function createTailwindConfig(targetDir: string) {

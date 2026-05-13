@@ -5,6 +5,8 @@ import chalk from 'chalk'
 import { spawn, ChildProcess } from 'child_process'
 
 let viteProcess: ChildProcess | null = null
+let esbuildCtx: esbuild.BuildContext | null = null
+let fileWatcher: any = null
 
 export async function dev() {
   const cwd = process.cwd()
@@ -44,26 +46,27 @@ export async function dev() {
 }
 
 async function startBackendWatch(cwd: string, entryPoint: string) {
-  const ctx = await esbuild.context({
+  esbuildCtx = await esbuild.context({
     entryPoints: [entryPoint],
     bundle: true,
     platform: 'node',
+    external: ['electron'],
     outfile: path.join(cwd, 'dist/main.js'),
     sourcemap: true
   })
 
-  await ctx.watch()
+  await esbuildCtx.watch()
   console.log(chalk.green('✓ 后端监听已启动'))
 
   // 监听文件变化并输出日志
   const chokidar = await import('chokidar')
-  const watcher = chokidar.watch(['src/main.ts', 'src/**/*.ts'], {
+  fileWatcher = chokidar.watch(['src/main.ts', 'src/**/*.ts'], {
     cwd,
     ignoreInitial: true,
     ignored: ['src/ui/**']
   })
 
-  watcher.on('change', (file) => {
+  fileWatcher.on('change', (file: string) => {
     console.log(chalk.yellow(`[后端] 文件变化: ${file}`))
   })
 }
@@ -78,25 +81,30 @@ async function startViteDevServer(cwd: string) {
 
   // 每次启动开发模式都构建 UI
   // 这样应用可以加载最新的插件 UI
-  console.log(chalk.blue('构建 UI...'))
-  await new Promise<void>((resolve, reject) => {
-    const viteBuild = spawn('npx', ['vite', 'build'], {
-      cwd,
-      stdio: 'inherit',
-      shell: true
-    })
+  try {
+    console.log(chalk.blue('构建 UI...'))
+    await new Promise<void>((resolve, reject) => {
+      const viteBuild = spawn('npx', ['vite', 'build'], {
+        cwd,
+        stdio: 'inherit',
+        shell: true
+      })
 
-    viteBuild.on('close', (code) => {
-      if (code === 0) {
-        console.log(chalk.green('✓ UI 构建完成: ui/'))
-        resolve()
-      } else {
-        reject(new Error(`Vite 构建失败，退出码: ${code}`))
-      }
-    })
+      viteBuild.on('close', (code) => {
+        if (code === 0) {
+          console.log(chalk.green('✓ UI 构建完成: ui/'))
+          resolve()
+        } else {
+          reject(new Error(`Vite 构建失败，退出码: ${code}`))
+        }
+      })
 
-    viteBuild.on('error', reject)
-  })
+      viteBuild.on('error', reject)
+    })
+  } catch (err: any) {
+    console.log(chalk.yellow(`⚠️ 初始 UI 构建失败: ${err.message}`))
+    console.log(chalk.yellow('  继续启动开发服务器，请修复代码后刷新'))
+  }
 
   console.log()
   console.log(chalk.blue('启动 Vite 开发服务器...'))
@@ -117,6 +125,9 @@ async function startViteDevServer(cwd: string) {
 
 function cleanup() {
   console.log(chalk.blue('\n停止开发模式...'))
+
+  esbuildCtx?.dispose()
+  fileWatcher?.close()
 
   if (viteProcess) {
     viteProcess.kill()

@@ -63,14 +63,15 @@ async function createArchive(
   outputPath: string,
   manifest: PluginPackageManifest
 ): Promise<void> {
-  return new Promise(async (resolve, reject) => {
-    const output = fs.createWriteStream(outputPath)
-    const archive = archiver('zip', { zlib: { level: 9 } })
+  const output = fs.createWriteStream(outputPath)
+  const archive = archiver('zip', { zlib: { level: 9 } })
 
+  const streamDone = new Promise<void>((resolve, reject) => {
     output.on('close', () => resolve())
     archive.on('error', (err: Error) => reject(err))
+  })
 
-    archive.pipe(output)
+  archive.pipe(output)
     const addedArchivePaths = new Set<string>()
     const addedPackages = new Set<string>()
 
@@ -161,7 +162,8 @@ async function createArchive(
     }
 
     archive.finalize()
-  })
+
+    await streamDone
 }
 
 async function addTracedRuntimeDependencies(
@@ -368,8 +370,10 @@ function addJsonToArchive(
 }
 
 function createPackagedManifest(manifest: PluginPackageManifest): PluginPackageManifest {
+  // 移除仅开发期间使用的字段，不打包到安装包中
+  const { dependencies, assets, ...rest } = manifest
   return {
-    ...manifest,
+    ...rest,
     main: ENTRY_MAIN_ARCHIVE_NAME
   }
 }

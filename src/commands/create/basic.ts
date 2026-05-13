@@ -6,6 +6,7 @@ import {
   buildBasicMain,
   buildBasicManifest,
   buildBasicPackageJson,
+  buildBasicTsConfig,
   buildGitignore,
   buildBasicReadme
 } from './templates/basic'
@@ -29,6 +30,10 @@ export async function createBasicProject(targetDir: string, name: string) {
   const mainTs = buildBasicMain(name)
   fs.writeFileSync(path.join(targetDir, 'src/main.ts'), mainTs)
   console.log(chalk.green('  created src/main.ts'))
+
+  const tsconfig = buildBasicTsConfig()
+  fs.writeJsonSync(path.join(targetDir, 'tsconfig.json'), tsconfig, { spaces: 2 })
+  console.log(chalk.green('  created tsconfig.json'))
 
   const typesDts = buildMulbyTypes()
   fs.writeFileSync(path.join(targetDir, 'src/types/mulby.d.ts'), typesDts)
