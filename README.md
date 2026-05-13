@@ -143,7 +143,7 @@ my-plugin/
 - `preload`: 可选 CommonJS preload，例如 `preload.cjs`。当插件 UI 需要 Node.js、Electron 桥接、原生模块或外部二进制时使用
 - `assets`: 打包白名单。额外 HTML、子窗口 preload、`.node` 原生模块、外部二进制、语言包等运行资源需要列入
 - `type`: 插件类型，例如 `utility`、`developer`、`ai`
-- `pluginSetting`: 插件窗口行为，例如 `single`、`height`
+- `pluginSetting`: 插件运行行为，例如 `single`、`defaultDetached`、`background`、`persistent`、`height`
 - `window`: 独立窗口尺寸和窗口行为配置，例如 `type`、`width`、`height`、`alwaysOnTop`、`skipTaskbar`
 
 ### 旧插件兼容窗口

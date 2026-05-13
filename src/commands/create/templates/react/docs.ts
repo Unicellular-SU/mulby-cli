@@ -53,7 +53,7 @@ export const rpc = {
 }
 \`\`\`
 
-如果插件没有打开 UI 时也要接收消息，在 \`manifest.json\` 中启用后台运行：
+如果插件没有打开 UI 时也要接收消息，在 \`manifest.json\` 中启用后台运行。是否跟随 Mulby 启动由用户在插件窗口菜单中勾选：
 
 \`\`\`json
 {
