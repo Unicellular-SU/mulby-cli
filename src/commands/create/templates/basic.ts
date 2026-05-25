@@ -112,6 +112,26 @@ Plugin description
 
 - \`${name}\` - main feature
 
+## Command execution permission
+
+The default template does not enable command execution. Add \`commandExecution.direct\` to \`manifest.json\` only when backend code actually calls \`context.api.shell.runCommand\` or the global \`mulby.shell.runCommand\`:
+
+\`\`\`json
+{
+  "permissions": {
+    "commandExecution": {
+      "direct": {
+        "enabled": true,
+        "defaultProfile": "workspace",
+        "maxProfile": "workspace"
+      }
+    }
+  }
+}
+\`\`\`
+
+Each command can request \`executionProfile: "sandbox" | "workspace" | "trusted"\`, but the request cannot exceed the manifest \`maxProfile\`. If this plugin hosts its own AI and wants that AI to use Mulby's command-backed capabilities, declare \`commandExecution.ai\` separately. Legacy \`runCommand: true\` only authorizes direct plugin commands and does not authorize AI-generated commands.
+
 ## Messaging subscriptions
 
 For plugin-to-plugin messaging, keep subscriptions in the backend and expose cached data to the UI through \`rpc\` methods. If the plugin must receive messages while no UI is open, set \`manifest.pluginSetting.background = true\` and register the same handler from \`onBackground(context)\`. Whether it follows Mulby startup is controlled by the user from the plugin window menu or the search-result context menu.

@@ -21,6 +21,26 @@ export function buildReactReadme(name: string) {
 
 - \`${name}\` - 主功能
 
+## 命令执行权限
+
+默认模板不会开启命令执行权限。只有插件后端确实需要调用 \`context.api.shell.runCommand\` 或全局 \`mulby.shell.runCommand\` 时，才在 \`manifest.json\` 中声明 \`commandExecution.direct\`：
+
+\`\`\`json
+{
+  "permissions": {
+    "commandExecution": {
+      "direct": {
+        "enabled": true,
+        "defaultProfile": "workspace",
+        "maxProfile": "workspace"
+      }
+    }
+  }
+}
+\`\`\`
+
+调用时可用 \`executionProfile\` 请求 \`sandbox\`、\`workspace\` 或 \`trusted\`，但不能超过 manifest 允许的 \`maxProfile\`。如果插件承载自己的 AI，并希望这个 AI 使用 Mulby 内置命令型能力，需要单独声明 \`commandExecution.ai\`；旧版 \`runCommand: true\` 只兼容插件自身直接调命令，不授权 AI 生成命令。
+
 ## 插件通信
 
 后端可以使用 \`context.api.messaging\` 或全局 \`mulby.messaging\` 与其他插件通信。需要长期接收消息时，把订阅注册在后端，并让 UI 通过 \`window.mulby.host.call(...)\` 读取后端缓存；不要把消息缓存只放在前端。

@@ -199,13 +199,14 @@ interface MulbyWindow {
 }
 
 interface MulbySubInput {
-  set(placeholder?: string, isFocus?: boolean): Promise<boolean>
+  set(placeholder?: string, isFocus?: boolean, options?: { forwardKeys?: string[] }): Promise<boolean>
   remove(): Promise<boolean>
   setValue(text: string): void
   focus(): void
   blur(): void
   select(): void
   onChange(callback: (data: { text: string }) => void): Disposable
+  onKeyDown(callback: (data: { key: string; shift?: boolean; ctrl?: boolean; alt?: boolean; meta?: boolean }) => void): Disposable
 }
 
 type ThemeMode = 'light' | 'dark' | 'system'
@@ -572,6 +573,51 @@ interface ColorPickResult {
   b: number
 }
 
+type CommandExecutionProfile = 'sandbox' | 'workspace' | 'trusted'
+type CommandSandboxLevel = 'os' | 'policy' | 'none'
+type CommandSandboxBackendMode = 'auto' | 'policy' | 'os'
+type CommandSandboxBackendName = 'policy' | 'macos-sandbox-exec' | 'windows-job-object' | 'linux-namespace'
+type CommandAuditStatus = 'allowed' | 'blocked' | 'error' | 'timeout'
+
+interface CommandRule {
+  id: string
+  mode: 'exact' | 'prefix'
+  value: string
+  enabled?: boolean
+}
+
+interface CommandCallerIdentity {
+  kind: 'app' | 'plugin' | 'ai' | 'openclaw' | 'system'
+  host?: 'app' | 'plugin' | 'openclaw' | 'system'
+  actor?: 'human' | 'ai' | 'remote' | 'system'
+  pluginId?: string
+  pluginType?: string
+  requestId?: string
+  model?: string
+  skillIds?: string[]
+}
+
+interface CommandSandboxSettings {
+  enabled: boolean
+  backendMode: CommandSandboxBackendMode
+  fallbackToPolicy: boolean
+  allowedRoots: string[]
+  writableRoots: string[]
+  networkAllowed: boolean
+}
+
+interface CommandTrustRecord {
+  prefix: string
+  matchMode?: 'executable' | 'commandLineExact'
+  source: 'app' | 'plugin'
+  pluginId?: string
+  command: string
+  args?: string[]
+  shell?: boolean
+  createdAt: number
+  lastUsedAt: number
+}
+
 interface MulbyScreen {
   getAllDisplays(): Promise<DisplayInfo[]>
   getPrimaryDisplay(): Promise<DisplayInfo>
@@ -593,22 +639,52 @@ interface MulbyScreen {
 
 interface CommandAuditItem {
   id: string
-  source: string
-  command: string
-  args: string[]
-  cwd?: string
-  shell: boolean
-  allowed: boolean
+  timestamp: number
+  source: 'app' | 'plugin'
   pluginId?: string
-  createdAt: number
+  caller?: CommandCallerIdentity
+  executionProfile?: CommandExecutionProfile
+  sandboxLevel?: CommandSandboxLevel
+  sandboxBackend?: CommandSandboxBackendName
+  sandboxFallbackReason?: string
+  elevatedFrom?: CommandExecutionProfile
+  networkAllowed?: boolean
+  rootScope?: string[]
+  command: string
+  args?: string[]
+  envKeys?: string[]
+  cwd?: string
+  shell?: boolean
+  timeoutMs?: number
+  durationMs?: number
+  exitCode?: number | null
+  signal?: string | null
+  status: CommandAuditStatus
+  reason?: string
+  success?: boolean
+  timedOut?: boolean
+  truncated?: boolean
 }
 
 interface CommandRunnerSettings {
   enabled: boolean
   requireConsent: boolean
   allowShell: boolean
-  allowList?: string[]
-  denyList?: string[]
+  defaultTimeoutMs: number
+  maxTimeoutMs: number
+  maxOutputBytes: number
+  maxConcurrent: number
+  maxQueueSize: number
+  denyEnvKeys: string[]
+  maskEnvKeysInAudit: string[]
+  allowList: CommandRule[]
+  denyList: CommandRule[]
+  trustedFingerprints: CommandTrustRecord[]
+  sandbox: CommandSandboxSettings
+  audit: {
+    maxItems: number
+    records: CommandAuditItem[]
+  }
 }
 
 interface RunCommandInput {
@@ -618,6 +694,9 @@ interface RunCommandInput {
   env?: Record<string, string>
   timeoutMs?: number
   shell?: boolean
+  executionProfile?: CommandExecutionProfile
+  network?: boolean
+  writableRoots?: string[]
 }
 
 interface RunCommandResult {
@@ -812,8 +891,23 @@ interface ContextMenuItem {
   submenu?: ContextMenuItem[]
 }
 
+interface ActionMenuItem {
+  id: string
+  label: string
+  separator?: boolean
+  danger?: boolean
+  disabled?: boolean
+  checked?: boolean
+}
+
+interface ActionMenuPoint {
+  x: number
+  y: number
+}
+
 interface MulbyMenu {
   showContextMenu(items: ContextMenuItem[]): Promise<string | null>
+  showActionMenu(items: ActionMenuItem[], point?: ActionMenuPoint): Promise<string | null>
 }
 
 interface GlobalInputEvent {
@@ -2037,22 +2131,9 @@ interface BackendPluginAPIDirect {
     openFolder(path: string): Promise<string>
     trashItem(path: string): Promise<void>
     beep(): void
-    runCommand(input: {
-      command: string
-      args?: string[]
-      cwd?: string
-      env?: Record<string, string>
-      timeoutMs?: number
-      shell?: boolean
-    }): Promise<any>
-    getRunCommandPolicy(): Promise<{
-      enabled: boolean
-      requireConsent: boolean
-      allowShell: boolean
-      allowList?: string[]
-      denyList?: string[]
-    }>
-    listRunCommandAudit(limit?: number): Promise<any[]>
+    runCommand(input: RunCommandInput): Promise<RunCommandResult>
+    getRunCommandPolicy(): Promise<Pick<CommandRunnerSettings, 'enabled' | 'requireConsent' | 'allowShell' | 'allowList' | 'denyList'>>
+    listRunCommandAudit(limit?: number): Promise<CommandAuditItem[]>
   }
   dialog: MulbyDialog
   system: {
