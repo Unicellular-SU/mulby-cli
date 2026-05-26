@@ -206,6 +206,7 @@ interface MulbySubInput {
   blur(): void
   select(): void
   onChange(callback: (data: { text: string }) => void): Disposable
+  onKeyDown(callback: (data: { key: string; shift?: boolean; ctrl?: boolean; alt?: boolean; meta?: boolean }) => void): Disposable
 }
 
 type ThemeMode = 'light' | 'dark' | 'system'
@@ -812,8 +813,18 @@ interface ContextMenuItem {
   submenu?: ContextMenuItem[]
 }
 
+interface ActionMenuItem {
+  id: string
+  label: string
+  separator?: boolean
+  danger?: boolean
+  disabled?: boolean
+  checked?: boolean
+}
+
 interface MulbyMenu {
   showContextMenu(items: ContextMenuItem[]): Promise<string | null>
+  showActionMenu(items: ActionMenuItem[], point?: { x: number; y: number }): Promise<string | null>
 }
 
 interface GlobalInputEvent {
@@ -1756,6 +1767,11 @@ interface MulbyAPI {
   subInput: MulbySubInput
   plugin: MulbyPlugin
   pluginStore: MulbyPluginStore
+  directoryAccess: {
+    request(input?: { path?: string; mode?: 'read' | 'readwrite'; title?: string; message?: string; reason?: string }): Promise<{ id: string; pluginId: string; path: string; mode: 'read' | 'readwrite'; source: string; reason?: string; createdAt: number; lastUsedAt?: number } | null>
+    list(): Promise<{ id: string; pluginId: string; path: string; mode: 'read' | 'readwrite'; source: string; reason?: string; createdAt: number; lastUsedAt?: number }[]>
+    revoke(grantIdOrPath: string): Promise<boolean>
+  }
   theme?: MulbyTheme
   ai: MulbyAi
   screen: MulbyScreen
@@ -2053,6 +2069,11 @@ interface BackendPluginAPIDirect {
       denyList?: string[]
     }>
     listRunCommandAudit(limit?: number): Promise<any[]>
+  }
+  directoryAccess: {
+    request(input?: { path?: string; mode?: 'read' | 'readwrite'; title?: string; message?: string; reason?: string }): Promise<{ id: string; pluginId: string; path: string; mode: 'read' | 'readwrite'; source: string; reason?: string; createdAt: number; lastUsedAt?: number } | null>
+    list(): Promise<{ id: string; pluginId: string; path: string; mode: 'read' | 'readwrite'; source: string; reason?: string; createdAt: number; lastUsedAt?: number }[]>
+    revoke(grantIdOrPath: string): Promise<boolean>
   }
   dialog: MulbyDialog
   system: {
