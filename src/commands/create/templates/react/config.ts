@@ -9,6 +9,7 @@
  */
 export function buildReactManifest(name: string) {
   return {
+    $schema: './node_modules/.mulby/manifest-schema.json',
     id: name,
     name,
     version: '1.0.0',

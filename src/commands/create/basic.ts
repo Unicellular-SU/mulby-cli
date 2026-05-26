@@ -1,7 +1,7 @@
 import * as fs from 'fs-extra'
 import * as path from 'path'
 import chalk from 'chalk'
-import { copyDefaultIcon } from './assets'
+import { copyDefaultIcon, copyManifestSchema } from './assets'
 import {
   buildBasicMain,
   buildBasicManifest,
@@ -18,6 +18,7 @@ export async function createBasicProject(targetDir: string, name: string) {
   fs.mkdirSync(path.join(targetDir, 'src/types'), { recursive: true })
 
   copyDefaultIcon(targetDir)
+  copyManifestSchema(targetDir)
 
   const manifest = buildBasicManifest(name)
   fs.writeJsonSync(path.join(targetDir, 'manifest.json'), manifest, { spaces: 2 })

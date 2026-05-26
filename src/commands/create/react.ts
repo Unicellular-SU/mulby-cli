@@ -1,7 +1,7 @@
 import * as fs from 'fs-extra'
 import * as path from 'path'
 import chalk from 'chalk'
-import { copyDefaultIcon } from './assets'
+import { copyDefaultIcon, copyManifestSchema } from './assets'
 import {
   buildAppTsx,
   buildBackendMain,
@@ -26,6 +26,7 @@ export async function createReactProject(targetDir: string, name: string) {
   fs.mkdirSync(path.join(targetDir, 'src/ui'))
 
   copyDefaultIcon(targetDir)
+  copyManifestSchema(targetDir)
   createReactManifest(targetDir, name)
   createReactPackageJson(targetDir, name)
   createTsConfig(targetDir)
