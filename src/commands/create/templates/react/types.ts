@@ -1885,6 +1885,8 @@ interface BackendClipboardHistoryItem {
   size: number
   favorite: boolean
   tags?: string[]
+  sourceApp?: string
+  sourceTitle?: string
 }
 
 interface BackendClipboardHistoryStats {
@@ -1900,6 +1902,7 @@ interface BackendClipboardHistory {
     type?: 'text' | 'image' | 'files'
     search?: string
     favorite?: boolean
+    sourceApp?: string
     limit?: number
     offset?: number
   }): Promise<BackendClipboardHistoryItem[]>
