@@ -132,6 +132,26 @@ The default template does not enable command execution. Add \`commandExecution.d
 
 Each command can request \`executionProfile: "sandbox" | "workspace" | "trusted"\`, but the request cannot exceed the manifest \`maxProfile\`. If this plugin hosts its own AI and wants that AI to use Mulby's command-backed capabilities, declare \`commandExecution.ai\` separately. Legacy \`runCommand: true\` only authorizes direct plugin commands and does not authorize AI-generated commands.
 
+## Directory access
+
+Plugins can request user-approved directory access at runtime. This does not require a manifest declaration. A \`readwrite\` grant expands the command workspace roots for this plugin, but command execution still requires \`commandExecution.direct\` or \`commandExecution.ai\`.
+
+\`\`\`ts
+const grant = await context.api.directoryAccess.request({
+  mode: 'readwrite',
+  reason: 'Run commands in the selected project directory'
+})
+
+if (grant) {
+  await context.api.shell.runCommand({
+    command: 'git',
+    args: ['status'],
+    cwd: grant.path,
+    executionProfile: 'workspace'
+  })
+}
+\`\`\`
+
 ## Messaging subscriptions
 
 For plugin-to-plugin messaging, keep subscriptions in the backend and expose cached data to the UI through \`rpc\` methods. If the plugin must receive messages while no UI is open, set \`manifest.pluginSetting.background = true\` and register the same handler from \`onBackground(context)\`. Whether it follows Mulby startup is controlled by the user from the plugin window menu or the search-result context menu.

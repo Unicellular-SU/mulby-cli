@@ -578,6 +578,7 @@ type CommandSandboxLevel = 'os' | 'policy' | 'none'
 type CommandSandboxBackendMode = 'auto' | 'policy' | 'os'
 type CommandSandboxBackendName = 'policy' | 'macos-sandbox-exec' | 'windows-job-object' | 'linux-namespace'
 type CommandAuditStatus = 'allowed' | 'blocked' | 'error' | 'timeout'
+type PluginDirectoryAccessMode = 'read' | 'readwrite'
 
 interface CommandRule {
   id: string
@@ -714,6 +715,25 @@ interface RunCommandResult {
   truncated: boolean
 }
 
+interface PluginDirectoryAccessGrant {
+  id: string
+  pluginId: string
+  path: string
+  mode: PluginDirectoryAccessMode
+  source: 'picker' | 'path-confirmation'
+  reason?: string
+  createdAt: number
+  lastUsedAt?: number
+}
+
+interface PluginDirectoryAccessRequestInput {
+  path?: string
+  mode?: PluginDirectoryAccessMode
+  title?: string
+  message?: string
+  reason?: string
+}
+
 interface MulbyShell {
   openPath(path: string): Promise<string>
   openExternal(url: string): Promise<void>
@@ -727,6 +747,12 @@ interface MulbyShell {
   listRunCommandAudit(limit?: number): Promise<CommandAuditItem[]>
   clearRunCommandAudit(): Promise<CommandRunnerSettings>
   clearRunCommandTrusted(): Promise<CommandRunnerSettings>
+}
+
+interface MulbyDirectoryAccess {
+  request(input?: PluginDirectoryAccessRequestInput): Promise<PluginDirectoryAccessGrant | null>
+  list(): Promise<PluginDirectoryAccessGrant[]>
+  revoke(grantIdOrPath: string): Promise<boolean>
 }
 
 interface MulbyDialog {
@@ -1854,6 +1880,7 @@ interface MulbyAPI {
   ai: MulbyAi
   screen: MulbyScreen
   shell: MulbyShell
+  directoryAccess: MulbyDirectoryAccess
   desktop: MulbyDesktop
   dialog: MulbyDialog
   system: MulbySystem
@@ -2135,6 +2162,7 @@ interface BackendPluginAPIDirect {
     getRunCommandPolicy(): Promise<Pick<CommandRunnerSettings, 'enabled' | 'requireConsent' | 'allowShell' | 'allowList' | 'denyList'>>
     listRunCommandAudit(limit?: number): Promise<CommandAuditItem[]>
   }
+  directoryAccess: MulbyDirectoryAccess
   dialog: MulbyDialog
   system: {
     getSystemInfo(): Promise<any>

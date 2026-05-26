@@ -41,6 +41,26 @@ export function buildReactReadme(name: string) {
 
 调用时可用 \`executionProfile\` 请求 \`sandbox\`、\`workspace\` 或 \`trusted\`，但不能超过 manifest 允许的 \`maxProfile\`。如果插件承载自己的 AI，并希望这个 AI 使用 Mulby 内置命令型能力，需要单独声明 \`commandExecution.ai\`；旧版 \`runCommand: true\` 只兼容插件自身直接调命令，不授权 AI 生成命令。
 
+## 目录授权
+
+插件可以在运行时申请用户确认的目录访问权限，不需要在 manifest 中预声明。获得 \`readwrite\` 授权后，该目录会扩展当前插件的命令 workspace root；但命令执行本身仍需要 \`commandExecution.direct\` 或 \`commandExecution.ai\`。
+
+\`\`\`ts
+const grant = await context.api.directoryAccess.request({
+  mode: 'readwrite',
+  reason: '在用户选择的项目目录中运行命令'
+})
+
+if (grant) {
+  await context.api.shell.runCommand({
+    command: 'git',
+    args: ['status'],
+    cwd: grant.path,
+    executionProfile: 'workspace'
+  })
+}
+\`\`\`
+
 ## 插件通信
 
 后端可以使用 \`context.api.messaging\` 或全局 \`mulby.messaging\` 与其他插件通信。需要长期接收消息时，把订阅注册在后端，并让 UI 通过 \`window.mulby.host.call(...)\` 读取后端缓存；不要把消息缓存只放在前端。
