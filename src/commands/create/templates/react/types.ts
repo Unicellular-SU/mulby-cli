@@ -1876,6 +1876,11 @@ interface MulbyAPI {
   subInput: MulbySubInput
   plugin: MulbyPlugin
   pluginStore: MulbyPluginStore
+  directoryAccess: {
+    request(input?: { path?: string; mode?: 'read' | 'readwrite'; title?: string; message?: string; reason?: string }): Promise<{ id: string; pluginId: string; path: string; mode: 'read' | 'readwrite'; source: string; reason?: string; createdAt: number; lastUsedAt?: number } | null>
+    list(): Promise<{ id: string; pluginId: string; path: string; mode: 'read' | 'readwrite'; source: string; reason?: string; createdAt: number; lastUsedAt?: number }[]>
+    revoke(grantIdOrPath: string): Promise<boolean>
+  }
   theme?: MulbyTheme
   ai: MulbyAi
   screen: MulbyScreen
@@ -1990,6 +1995,8 @@ interface BackendClipboardHistoryItem {
   size: number
   favorite: boolean
   tags?: string[]
+  sourceApp?: string
+  sourceTitle?: string
 }
 
 interface BackendClipboardHistoryStats {
@@ -2005,6 +2012,7 @@ interface BackendClipboardHistory {
     type?: 'text' | 'image' | 'files'
     search?: string
     favorite?: boolean
+    sourceApp?: string
     limit?: number
     offset?: number
   }): Promise<BackendClipboardHistoryItem[]>

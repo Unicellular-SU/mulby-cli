@@ -15,3 +15,13 @@ export function copyDefaultIcon(targetDir: string) {
     console.log(chalk.green('  ✓ icon.png'))
   }
 }
+
+export function copyManifestSchema(targetDir: string) {
+  const schemaPath = path.join(getAssetsDir(), 'manifest-schema.json')
+  if (!fs.existsSync(schemaPath)) return
+
+  const dest = path.join(targetDir, 'node_modules', '.mulby')
+  fs.mkdirSync(dest, { recursive: true })
+  fs.copyFileSync(schemaPath, path.join(dest, 'manifest-schema.json'))
+  console.log(chalk.green('  ✓ manifest-schema.json (JSON Schema)'))
+}
