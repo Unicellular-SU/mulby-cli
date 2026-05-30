@@ -1339,34 +1339,64 @@ interface MulbyLog {
   onLog(callback: (entry: LogEntry) => void): Disposable
 }
 
-type AiSkillSource = 'manual' | 'local-dir' | 'zip' | 'json' | 'builtin' | 'system'
+type CommandCallerIdentity = {
+  kind: 'app' | 'plugin' | 'ai' | 'openclaw' | 'system'
+  host?: 'app' | 'plugin' | 'openclaw' | 'system'
+  actor?: 'human' | 'ai' | 'remote' | 'system'
+  pluginId?: string
+  pluginType?: string
+  requestId?: string
+  model?: string
+  skillIds?: string[]
+}
+type AiSkillSource = 'manual' | 'local-dir' | 'zip' | 'npx' | 'json' | 'builtin' | 'system'
 type AiSkillTrustLevel = 'untrusted' | 'reviewed' | 'trusted'
+type AiSkillSelectionMeta = {
+  id: string
+  source: AiSkillSource
+  trustLevel: AiSkillTrustLevel
+}
+type AiCapabilityDebugInfo = {
+  requested: string[]
+  allowed: string[]
+  denied: string[]
+  reasons: string[]
+  selectedSkills?: AiSkillSelectionMeta[]
+}
+type AiPolicyDebugInfo = {
+  skills: {
+    requested?: AiSkillSelection
+    selectedSkillIds: string[]
+    selectedSkillNames: string[]
+    reasons: string[]
+  }
+  mcp: {
+    requested?: AiMcpSelection
+    resolved?: AiMcpSelection
+  }
+  toolContext: {
+    requested?: AiToolContext
+    resolved?: AiToolContext
+  }
+  capabilities: {
+    requested: string[]
+    resolved: string[]
+  }
+  internalTools: {
+    requested: string[]
+    resolved: string[]
+  }
+}
 
 type AiMessage = {
   role: 'system' | 'user' | 'assistant'
   content?: string | AiMessageContent[]
   reasoning_content?: string
-  chunkType?: 'meta' | 'text' | 'reasoning' | 'tool-call' | 'tool-result' | 'error' | 'end'
-  capability_debug?: {
-    requested: string[]
-    allowed: string[]
-    denied: string[]
-    reasons: string[]
-    selectedSkills?: Array<{ id: string; source: AiSkillSource; trustLevel: AiSkillTrustLevel }>
-  }
-  policy_debug?: {
-    skills: {
-      requested?: AiSkillSelection
-      selectedSkillIds: string[]
-      selectedSkillNames: string[]
-      reasons: string[]
-    }
-    mcp: { requested?: AiMcpSelection; resolved?: AiMcpSelection }
-    toolContext: { requested?: AiToolContext; resolved?: AiToolContext }
-    capabilities: { requested: string[]; resolved: string[] }
-    internalTools: { requested: string[]; resolved: string[] }
-  }
+  chunkType?: 'meta' | 'text' | 'reasoning' | 'tool-call' | 'tool-progress' | 'tool-result' | 'error' | 'end'
+  capability_debug?: AiCapabilityDebugInfo
+  policy_debug?: AiPolicyDebugInfo
   tool_call?: { id: string; name: string; args?: unknown }
+  tool_progress?: { id?: string; name: string; progress: number; total?: number; message?: string }
   tool_result?: { id: string; name: string; result?: unknown }
   error?: { message: string; code?: string; category?: string; retryable?: boolean; statusCode?: number }
   usage?: AiTokenBreakdown
@@ -1499,6 +1529,29 @@ type AiSkillMcpPolicy = {
   allowedToolIds?: string[]
   blockedToolIds?: string[]
 }
+type AiSkillMulbyExtensions = {
+  mode?: 'manual' | 'auto' | 'both'
+  triggerPhrases?: string[]
+  capabilities?: string[]
+  internalTools?: string[]
+  mcpPolicy?: AiSkillMcpPolicy
+}
+type AiSkillDescriptor = {
+  id: string
+  name: string
+  description: string
+  license?: string
+  compatibility?: string
+  metadata?: Record<string, string>
+  allowedTools?: string[]
+  promptTemplate?: string
+  mulbyExtensions?: AiSkillMulbyExtensions
+  mode?: 'manual' | 'auto' | 'both'
+  triggerPhrases?: string[]
+  capabilities?: string[]
+  internalTools?: string[]
+  mcpPolicy?: AiSkillMcpPolicy
+}
 type AiSkillRecord = {
   id: string
   source: AiSkillSource
@@ -1512,19 +1565,7 @@ type AiSkillRecord = {
   trustLevel: AiSkillTrustLevel
   installedAt: number
   updatedAt: number
-  descriptor: {
-    id: string
-    name: string
-    description?: string
-    version?: string
-    author?: string
-    tags?: string[]
-    triggerPhrases?: string[]
-    promptTemplate?: string
-    mcpPolicy?: AiSkillMcpPolicy
-    capabilities?: string[]
-    internalTools?: string[]
-  }
+  descriptor: AiSkillDescriptor
 }
 type AiSkillSettings = {
   enabled: boolean
@@ -1540,7 +1581,7 @@ type AiSkillPreview = {
 type AiSkillResolveResult = {
   selectedSkillIds: string[]
   selectedSkillNames: string[]
-  selectedSkills?: Array<{ id: string; source: AiSkillSource; trustLevel: AiSkillTrustLevel }>
+  selectedSkills?: AiSkillSelectionMeta[]
   availableSkillsPrompt?: string
   systemPrompts: string[]
   mergedMcp?: AiMcpSelection
@@ -1576,6 +1617,7 @@ type AiSkillCreateProgressChunk = {
 type AiToolContext = {
   pluginName?: string
   internalTag?: string
+  caller?: CommandCallerIdentity
   requestId?: string
   mcpScope?: { allowedServerIds?: string[]; allowedToolIds?: string[] }
 }
@@ -1881,7 +1923,7 @@ interface MulbyAPI {
     list(): Promise<{ id: string; pluginId: string; path: string; mode: 'read' | 'readwrite'; source: string; reason?: string; createdAt: number; lastUsedAt?: number }[]>
     revoke(grantIdOrPath: string): Promise<boolean>
   }
-  theme?: MulbyTheme
+  theme: MulbyTheme
   ai: MulbyAi
   screen: MulbyScreen
   shell: MulbyShell

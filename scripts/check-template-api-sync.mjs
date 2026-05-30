@@ -67,6 +67,44 @@ function collectObjectMethods(objLiteral, prefix = '', out = new Set()) {
   return out
 }
 
+function collectObjectShape(objLiteral, prefix = '', out = new Set()) {
+  if (!objLiteral) return out
+
+  for (const prop of objLiteral.properties) {
+    if (ts.isSpreadAssignment(prop)) continue
+
+    if (ts.isMethodDeclaration(prop)) {
+      const name = getPropName(prop.name)
+      if (name) out.add(prefix + name + '()')
+      continue
+    }
+
+    if (!ts.isPropertyAssignment(prop) && !ts.isShorthandPropertyAssignment(prop)) continue
+
+    if (ts.isShorthandPropertyAssignment(prop)) {
+      out.add(prefix + prop.name.text + '()')
+      continue
+    }
+
+    const name = getPropName(prop.name)
+    if (!name) continue
+
+    const initializer = prop.initializer
+    if (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)) {
+      out.add(prefix + name + '()')
+    } else if (ts.isObjectLiteralExpression(initializer)) {
+      out.add(prefix + name)
+      collectObjectShape(initializer, prefix + name + '.', out)
+    } else if (ts.isIdentifier(initializer)) {
+      out.add(prefix + name + '()')
+    } else if (ts.isCallExpression(initializer)) {
+      out.add(prefix + name + '()')
+    }
+  }
+
+  return out
+}
+
 function findFunctionDeclaration(sf, fnName) {
   let found = null
 
@@ -222,6 +260,57 @@ function buildRendererMethods() {
   return out
 }
 
+function buildRendererShape() {
+  const out = new Set()
+
+  const coreSf = parseSource('src/preload/apis/core-api.ts')
+  collectObjectShape(findReturnObjectInFunction(findFunctionDeclaration(coreSf, 'createCoreApi')), '', out)
+
+  const platformSf = parseSource('src/preload/apis/platform-api.ts')
+  collectObjectShape(findReturnObjectInFunction(findFunctionDeclaration(platformSf, 'createPlatformApi')), '', out)
+
+  const appSf = parseSource('src/preload/apis/app-plugin-api.ts')
+  collectObjectShape(findReturnObjectInFunction(findFunctionDeclaration(appSf, 'createAppPluginApi')), '', out)
+
+  const aiSf = parseSource('src/preload/apis/ai.ts')
+  const aiObj = findVariableObject(aiSf, 'api')
+  if (aiObj) {
+    out.add('ai')
+    collectObjectShape(aiObj, 'ai.', out)
+  }
+
+  const ffSf = parseSource('src/preload/apis/ffmpeg.ts')
+  const ffObj = findReturnObjectInFunction(findFunctionDeclaration(ffSf, 'createFfmpegApi'))
+  if (ffObj) {
+    out.add('ffmpeg')
+    collectObjectShape(ffObj, 'ffmpeg.', out)
+  }
+
+  const logSf = parseSource('src/preload/apis/log-api.ts')
+  const logObj = findReturnObjectInFunction(findFunctionDeclaration(logSf, 'createLogApi'))
+  if (logObj) {
+    out.add('log')
+    collectObjectShape(logObj, 'log.', out)
+  }
+
+  const inbrowserSf = parseSource('src/preload/apis/inbrowser.ts')
+  const inbrowserObj = findVariableObject(inbrowserSf, 'inbrowser')
+  if (inbrowserObj) {
+    out.add('inbrowser')
+    collectObjectShape(inbrowserObj, 'inbrowser.', out)
+  }
+  const builderClass = findClassDeclaration(inbrowserSf, 'InBrowserBuilder')
+  if (builderClass) {
+    for (const method of collectClassPublicMethods(builderClass)) {
+      out.add('inbrowser.' + method + '()')
+    }
+  }
+
+  out.add('getSharpVersion()')
+
+  return out
+}
+
 function buildBackendMethods() {
   const out = new Set()
 
@@ -287,6 +376,84 @@ function buildBackendMethods() {
           for (const method of trayMethods) out.add(prefix + name + '.' + method)
         } else if (callee === 'createPluginDialog') {
           for (const method of dialogMethods) out.add(prefix + name + '.' + method)
+        }
+      }
+    }
+  }
+
+  if (apiObj) walk(apiObj)
+  return out
+}
+
+function buildBackendShape() {
+  const out = new Set()
+
+  const apiSf = parseSource('src/main/plugin/api.ts')
+  const apiObj = findReturnObjectInFunction(findFunctionDeclaration(apiSf, 'createPluginAPI'))
+
+  const shortcutSf = parseSource('src/main/plugin/shortcut.ts')
+  const shortcutMethods = collectClassPublicMethods(findClassDeclaration(shortcutSf, 'PluginGlobalShortcut'))
+
+  const securitySf = parseSource('src/main/plugin/security.ts')
+  const securityMethods = collectClassPublicMethods(findClassDeclaration(securitySf, 'PluginSecurity'))
+
+  const traySf = parseSource('src/main/plugin/tray.ts')
+  const trayMethods = collectClassPublicMethods(findClassDeclaration(traySf, 'PluginTray'))
+
+  const dialogSf = parseSource('src/main/plugin/dialog.ts')
+  const dialogMethods = collectClassPublicMethods(findClassDeclaration(dialogSf, 'PluginDialog'))
+
+  const inputSf = parseSource('src/main/plugin/input.ts')
+  const inputObj = findVariableObject(inputSf, 'pluginInput')
+  const inputMethods = inputObj ? collectObjectMethods(inputObj) : new Set()
+
+  function walk(objLiteral, prefix = '') {
+    if (!objLiteral) return
+
+    for (const prop of objLiteral.properties) {
+      if (ts.isSpreadAssignment(prop)) continue
+
+      if (ts.isMethodDeclaration(prop)) {
+        const name = getPropName(prop.name)
+        if (name) out.add(prefix + name + '()')
+        continue
+      }
+
+      if (!ts.isPropertyAssignment(prop) && !ts.isShorthandPropertyAssignment(prop)) continue
+
+      if (ts.isShorthandPropertyAssignment(prop)) {
+        out.add(prefix + prop.name.text)
+        continue
+      }
+
+      const name = getPropName(prop.name)
+      if (!name) continue
+
+      const initializer = prop.initializer
+      if (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)) {
+        out.add(prefix + name + '()')
+      } else if (ts.isObjectLiteralExpression(initializer)) {
+        out.add(prefix + name)
+        walk(initializer, prefix + name + '.')
+      } else if (ts.isIdentifier(initializer)) {
+        if (initializer.text === 'pluginInput') {
+          out.add(prefix + name)
+          for (const method of inputMethods) {
+            out.add(prefix + name + '.' + method + '()')
+          }
+        }
+      } else if (ts.isCallExpression(initializer) && ts.isIdentifier(initializer.expression)) {
+        const callee = initializer.expression.text
+        const methodSources = {
+          createPluginGlobalShortcut: shortcutMethods,
+          createPluginSecurity: securityMethods,
+          createPluginTray: trayMethods,
+          createPluginDialog: dialogMethods
+        }
+        const methods = methodSources[callee]
+        if (methods) {
+          out.add(prefix + name)
+          for (const method of methods) out.add(prefix + name + '.' + method + '()')
         }
       }
     }
@@ -402,6 +569,244 @@ function collectDeclaredMethods(interfaceName) {
   return out
 }
 
+function collectDeclaredApiShape(interfaceName) {
+  const sf = parseSource('mulby-template.d.ts', extractTemplateDeclarationSource())
+  const declarations = buildDeclarationMap(sf)
+  const out = new Set()
+  const seenRefs = new Set()
+
+  function walkMembers(members, prefix = '') {
+    for (const member of members) {
+      if (ts.isPropertySignature(member)) {
+        const name = getPropName(member.name)
+        if (!name || !member.type) continue
+        const key = `${prefix}${name}${member.questionToken ? '?' : ''}`
+        if (ts.isFunctionTypeNode(member.type)) {
+          out.add(`${key}()`)
+          continue
+        }
+        out.add(key)
+        walkTypeNode(member.type, `${prefix}${name}.`)
+      } else if (ts.isMethodSignature(member)) {
+        const name = getPropName(member.name)
+        if (name) out.add(`${prefix}${name}${member.questionToken ? '?' : ''}()`)
+      }
+    }
+  }
+
+  function walkTypeNode(typeNode, prefix = '') {
+    if (!typeNode) return
+    if (ts.isFunctionTypeNode(typeNode)) return
+    if (ts.isTypeLiteralNode(typeNode)) {
+      walkMembers(typeNode.members, prefix)
+      return
+    }
+    if (ts.isTypeReferenceNode(typeNode) && ts.isIdentifier(typeNode.typeName)) {
+      const refName = typeNode.typeName.text
+      const decl = declarations.get(refName)
+      if (!decl) return
+      const refKey = `${prefix}:${refName}`
+      if (seenRefs.has(refKey)) return
+      seenRefs.add(refKey)
+      if (ts.isInterfaceDeclaration(decl)) {
+        walkMembers(decl.members, prefix)
+      } else if (ts.isTypeAliasDeclaration(decl)) {
+        walkTypeNode(decl.type, prefix)
+      }
+      return
+    }
+    if (ts.isUnionTypeNode(typeNode) || ts.isIntersectionTypeNode(typeNode)) {
+      for (const inner of typeNode.types) walkTypeNode(inner, prefix)
+      return
+    }
+    if (ts.isParenthesizedTypeNode(typeNode)) {
+      walkTypeNode(typeNode.type, prefix)
+    }
+  }
+
+  const decl = declarations.get(interfaceName)
+  if (!decl) {
+    throw new Error(`Unable to locate declaration ${interfaceName}`)
+  }
+  if (ts.isInterfaceDeclaration(decl)) {
+    walkMembers(decl.members)
+  } else if (ts.isTypeAliasDeclaration(decl)) {
+    walkTypeNode(decl.type)
+  }
+  return out
+}
+
+function buildDeclarationMap(sf) {
+  const declarations = new Map()
+  sf.forEachChild((node) => {
+    if ((ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) && node.name?.text) {
+      declarations.set(node.name.text, node)
+    }
+  })
+  return declarations
+}
+
+function unionLiteralValues(typeNode) {
+  if (!ts.isUnionTypeNode(typeNode)) return null
+  const values = []
+  for (const item of typeNode.types) {
+    if (!ts.isLiteralTypeNode(item) || !ts.isStringLiteral(item.literal)) return null
+    values.push(item.literal.text)
+  }
+  return values.sort()
+}
+
+function getSimpleTypeReferenceName(typeNode) {
+  if (ts.isArrayTypeNode(typeNode)) {
+    return getSimpleTypeReferenceName(typeNode.elementType)
+  }
+  if (
+    ts.isTypeReferenceNode(typeNode) &&
+    ts.isIdentifier(typeNode.typeName) &&
+    typeNode.typeName.text === 'Array' &&
+    typeNode.typeArguments?.[0]
+  ) {
+    return getSimpleTypeReferenceName(typeNode.typeArguments[0])
+  }
+  if (ts.isTypeReferenceNode(typeNode) && ts.isIdentifier(typeNode.typeName)) {
+    return typeNode.typeName.text
+  }
+  return null
+}
+
+function collectTypeShape(typeName, sf) {
+  const declarations = buildDeclarationMap(sf)
+  const decl = declarations.get(typeName)
+  if (!decl) {
+    throw new Error(`Unable to locate type declaration ${typeName}`)
+  }
+
+  const out = new Set()
+
+  function addUnion(prefix, typeNode) {
+    const values = unionLiteralValues(typeNode)
+    if (!values) return false
+    out.add(`${prefix}=union:${values.join('|')}`)
+    return true
+  }
+
+  function walkMembers(members, prefix = '') {
+    for (const member of members) {
+      if (ts.isPropertySignature(member)) {
+        const name = getPropName(member.name)
+        if (!name || !member.type) continue
+        const key = `${prefix}${name}${member.questionToken ? '?' : ''}`
+        out.add(key)
+        if (addUnion(key, member.type)) continue
+        if (ts.isTypeLiteralNode(member.type)) {
+          walkMembers(member.type.members, `${prefix}${name}.`)
+          continue
+        }
+        const refName = getSimpleTypeReferenceName(member.type)
+        if (refName) out.add(`${key}:ref:${refName}`)
+      } else if (ts.isMethodSignature(member)) {
+        const name = getPropName(member.name)
+        if (name) out.add(`${prefix}${name}()`)
+      }
+    }
+  }
+
+  function walkDeclaration(node) {
+    if (ts.isInterfaceDeclaration(node)) {
+      walkMembers(node.members)
+      return
+    }
+    if (ts.isTypeAliasDeclaration(node)) {
+      if (addUnion('$', node.type)) return
+      if (ts.isTypeLiteralNode(node.type)) walkMembers(node.type.members)
+    }
+  }
+
+  walkDeclaration(decl)
+  return out
+}
+
+function collectApiShape(typeName, sf, options = {}) {
+  const declarations = buildDeclarationMap(sf)
+  const decl = declarations.get(typeName)
+  const ignoredPrefixes = options.ignoredPrefixes || []
+  if (!decl) {
+    throw new Error(`Unable to locate API declaration ${typeName}`)
+  }
+
+  const out = new Set()
+  const seenRefs = new Set()
+
+  function shouldIgnore(key) {
+    return ignoredPrefixes.some((prefix) => key === prefix || key.startsWith(`${prefix}.`))
+  }
+
+  function add(key) {
+    if (!shouldIgnore(key)) out.add(key)
+  }
+
+  function walkMembers(members, prefix = '') {
+    for (const member of members) {
+      if (ts.isPropertySignature(member)) {
+        const name = getPropName(member.name)
+        if (!name || !member.type) continue
+        const key = `${prefix}${name}${member.questionToken ? '?' : ''}`
+        if (ts.isFunctionTypeNode(member.type)) {
+          add(`${key}()`)
+          continue
+        }
+        add(key)
+        walkTypeNode(member.type, `${prefix}${name}.`, key)
+      } else if (ts.isMethodSignature(member)) {
+        const name = getPropName(member.name)
+        if (name) add(`${prefix}${name}()`)
+      }
+    }
+  }
+
+  function walkTypeNode(typeNode, prefix, keyForFunction = prefix.replace(/\.$/, '')) {
+    if (!typeNode) return
+    if (ts.isFunctionTypeNode(typeNode)) {
+      add(`${keyForFunction}()`)
+      return
+    }
+    if (ts.isTypeLiteralNode(typeNode)) {
+      walkMembers(typeNode.members, prefix)
+      return
+    }
+    if (ts.isTypeReferenceNode(typeNode) && ts.isIdentifier(typeNode.typeName)) {
+      const refName = typeNode.typeName.text
+      const refDecl = declarations.get(refName)
+      if (!refDecl) return
+      const refKey = `${prefix}:${refName}`
+      if (seenRefs.has(refKey)) return
+      seenRefs.add(refKey)
+      if (ts.isInterfaceDeclaration(refDecl)) {
+        walkMembers(refDecl.members, prefix)
+      } else if (ts.isTypeAliasDeclaration(refDecl)) {
+        walkTypeNode(refDecl.type, prefix)
+      }
+      return
+    }
+    if (ts.isUnionTypeNode(typeNode) || ts.isIntersectionTypeNode(typeNode)) {
+      for (const inner of typeNode.types) walkTypeNode(inner, prefix, keyForFunction)
+      return
+    }
+    if (ts.isParenthesizedTypeNode(typeNode)) {
+      walkTypeNode(typeNode.type, prefix, keyForFunction)
+      return
+    }
+  }
+
+  if (ts.isInterfaceDeclaration(decl)) {
+    walkMembers(decl.members)
+  } else if (ts.isTypeAliasDeclaration(decl)) {
+    walkTypeNode(decl.type, '')
+  }
+
+  return out
+}
+
 function diffMethods(actual, declared) {
   const actualSet = new Set(actual)
   const declaredSet = new Set(declared)
@@ -409,6 +814,15 @@ function diffMethods(actual, declared) {
   return {
     missing: [...actualSet].filter((method) => !declaredSet.has(method)).sort(),
     extra: [...declaredSet].filter((method) => !actualSet.has(method)).sort()
+  }
+}
+
+function diffSets(actual, declared) {
+  const actualSet = new Set(actual)
+  const declaredSet = new Set(declared)
+  return {
+    missing: [...actualSet].filter((item) => !declaredSet.has(item)).sort(),
+    extra: [...declaredSet].filter((item) => !actualSet.has(item)).sort()
   }
 }
 
@@ -441,18 +855,52 @@ const declaredRendererMethods = [...collectDeclaredMethods('MulbyAPI')].filter(
   (method) => method !== 'sharp' && !method.startsWith('sharp.')
 )
 const declaredBackendMethods = [...collectDeclaredMethods('BackendPluginAPIDirect')]
+const rendererShape = [...buildRendererShape()].filter((item) => item !== 'sharp' && !item.startsWith('sharp.'))
+const backendShape = [...buildBackendShape()]
+const declaredRendererShape = [...collectDeclaredApiShape('MulbyAPI')].filter((item) => item !== 'sharp' && !item.startsWith('sharp.'))
+const declaredBackendShape = [...collectDeclaredApiShape('BackendPluginAPIDirect')]
 
 const rendererDiff = diffMethods(rendererMethods, declaredRendererMethods)
 const backendDiff = diffMethods(backendMethods, declaredBackendMethods)
 
+const aiSource = parseSource('src/shared/types/ai.ts')
+const templateSource = parseSource('mulby-template.d.ts', extractTemplateDeclarationSource())
+const aiTypeNames = [
+  'AiSkillSource',
+  'AiMessage',
+  'AiSkillDescriptor',
+  'AiSkillRecord',
+  'AiSkillResolveResult',
+  'AiToolContext',
+  'AiOption'
+]
+const aiTypeDiffs = aiTypeNames.map((typeName) => ({
+  typeName,
+  diff: diffSets(collectTypeShape(typeName, aiSource), collectTypeShape(typeName, templateSource))
+}))
+const apiShapeDiffs = [
+  { label: 'renderer API shape', diff: diffSets(rendererShape, declaredRendererShape) },
+  { label: 'backend API shape', diff: diffSets(backendShape, declaredBackendShape) }
+]
+
 printDiff('renderer template API', rendererDiff)
 printDiff('backend template API', backendDiff)
+
+for (const { label, diff } of apiShapeDiffs) {
+  printDiff(label, diff)
+}
+
+for (const { typeName, diff } of aiTypeDiffs) {
+  printDiff(`AI type shape ${typeName}`, diff)
+}
 
 if (
   rendererDiff.missing.length > 0 ||
   rendererDiff.extra.length > 0 ||
   backendDiff.missing.length > 0 ||
-  backendDiff.extra.length > 0
+  backendDiff.extra.length > 0 ||
+  apiShapeDiffs.some(({ diff }) => diff.missing.length > 0 || diff.extra.length > 0) ||
+  aiTypeDiffs.some(({ diff }) => diff.missing.length > 0 || diff.extra.length > 0)
 ) {
   process.exitCode = 1
 }
