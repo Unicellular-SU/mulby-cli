@@ -1471,6 +1471,14 @@ type AiModel = {
   params?: AiModelParameters
   capabilities?: AiModelCapability[]
 }
+type AiModelsFilter = {
+  /** 按端点类型筛选（单值或多值）。 */
+  endpointType?: AiEndpointType | AiEndpointType[]
+  /** 按能力筛选（单值或多值），满足任意一个即包含。 */
+  capability?: AiModelType | AiModelType[]
+  /** 按 Provider 实例 ID 精确筛选。 */
+  providerId?: string
+}
 type AiProviderConfig = {
   id: string
   type?: string
@@ -1644,7 +1652,7 @@ type AiPromiseLike<T> = Promise<T> & { abort: () => void }
 
 interface MulbyAi {
   call(option: AiOption, onChunk?: (chunk: AiMessage) => void): AiPromiseLike<AiMessage>
-  allModels(): Promise<AiModel[]>
+  allModels(filter?: AiModelsFilter): Promise<AiModel[]>
   abort(requestId: string): Promise<void>
   skills: {
     list(): Promise<AiSkillRecord[]>
@@ -2111,7 +2119,7 @@ interface BackendScheduler {
 
 interface BackendMulbyAi {
   call(option: AiOption, onChunk?: (chunk: AiMessage) => void): AiPromiseLike<AiMessage>
-  allModels(): Promise<AiModel[]>
+  allModels(filter?: AiModelsFilter): Promise<AiModel[]>
   abort(requestId: string): void
   skills: {
     listEnabled(): Promise<AiSkillRecord[]>
