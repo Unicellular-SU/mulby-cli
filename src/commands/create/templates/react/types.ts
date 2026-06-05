@@ -1177,6 +1177,17 @@ interface MulbyDeveloper {
   removePluginPath(path: string): Promise<{ success: boolean }>
   reloadPlugins(): Promise<{ success: boolean }>
   selectDirectory(): Promise<string | null>
+  addPluginProject(args: { path: string; source?: 'added' | 'imported' | 'created' | 'migrated' }): Promise<{ success: boolean; error?: string }>
+  removePluginProject(args: { id?: string; path?: string }): Promise<{ success: boolean; error?: string }>
+  reloadPlugin(pluginId: string): Promise<{ success: boolean; error?: string }>
+  reloadPluginByPath(path: string): Promise<{ success: boolean; error?: string }>
+  validatePlugin(path: string): Promise<{ valid: boolean; errors?: string[] }>
+  listPluginProjects(): Promise<any[]>
+  createPlugin(args: { targetDir: string; name: string; template?: 'react' | 'basic' }): Promise<{ success: boolean; path?: string; error?: string }>
+  buildPlugin(path: string): Promise<{ success: boolean; error?: string }>
+  packPlugin(path: string): Promise<{ success: boolean; outputPath?: string; error?: string }>
+  openPluginDir(path: string): Promise<boolean>
+  updateProjectMeta(args: { id: string; lastOpenedAt?: number; label?: string }): Promise<{ success: boolean; error?: string }>
 }
 
 interface DesktopFileSearchResult {
