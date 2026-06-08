@@ -1172,22 +1172,114 @@ interface MulbySettings {
   onShortcutStatusChanged(callback: (status: ShortcutStatusMap) => void): Disposable
 }
 
+type PluginProjectType = 'single' | 'collection'
+type PluginProjectSource = 'added' | 'imported' | 'created' | 'migrated'
+
+interface PluginProjectEntry {
+  id: string
+  path: string
+  type: PluginProjectType
+  source: PluginProjectSource
+  label?: string
+  createdAt: number
+  lastOpenedAt?: number
+}
+
+interface DeveloperOpResult {
+  success: boolean
+  error?: string
+}
+
+interface AddPluginProjectResult {
+  success: boolean
+  project?: PluginProjectEntry
+  error?: string
+  warning?: string
+}
+
+interface CreatePluginResult {
+  success: boolean
+  path?: string
+  log: string
+  error?: string
+}
+
+interface BuildPluginResult {
+  success: boolean
+  log: string
+  error?: string
+}
+
+interface PackPluginResult {
+  success: boolean
+  outFile?: string
+  log: string
+  error?: string
+}
+
+interface PluginManifestSummary {
+  id: string
+  name: string
+  version: string
+  displayName: string
+  description?: string
+  main?: string
+  hasUi: boolean
+  featureCount: number
+  platform?: string | string[]
+}
+
+interface PluginValidationResult {
+  valid: boolean
+  errors: string[]
+  warnings: string[]
+  manifest?: PluginManifestSummary
+  mainEntryFound: boolean
+  built: boolean
+}
+
+interface PluginProjectPluginStatus {
+  id: string
+  displayName: string
+  path: string
+  manifestValid: boolean
+  manifestErrors: string[]
+  mainEntryFound: boolean
+  built: boolean
+  loaded: boolean
+  enabled: boolean
+  isDev: boolean
+  idConflictWith?: string
+}
+
+interface PluginProjectStatus {
+  projectId: string
+  path: string
+  type: PluginProjectType
+  source: PluginProjectSource
+  label?: string
+  exists: boolean
+  plugins: PluginProjectPluginStatus[]
+}
+
 interface MulbyDeveloper {
-  addPluginPath(path: string): Promise<{ success: boolean; error?: string }>
+  // LEGACY（向后兼容，直接写 pluginPaths）
+  addPluginPath(path: string): Promise<DeveloperOpResult>
   removePluginPath(path: string): Promise<{ success: boolean }>
   reloadPlugins(): Promise<{ success: boolean }>
   selectDirectory(): Promise<string | null>
-  addPluginProject(args: { path: string; source?: 'added' | 'imported' | 'created' | 'migrated' }): Promise<{ success: boolean; error?: string }>
-  removePluginProject(args: { id?: string; path?: string }): Promise<{ success: boolean; error?: string }>
-  reloadPlugin(pluginId: string): Promise<{ success: boolean; error?: string }>
-  reloadPluginByPath(path: string): Promise<{ success: boolean; error?: string }>
-  validatePlugin(path: string): Promise<{ valid: boolean; errors?: string[] }>
-  listPluginProjects(): Promise<any[]>
-  createPlugin(args: { targetDir: string; name: string; template?: 'react' | 'basic' }): Promise<{ success: boolean; path?: string; error?: string }>
-  buildPlugin(path: string): Promise<{ success: boolean; error?: string }>
-  packPlugin(path: string): Promise<{ success: boolean; outputPath?: string; error?: string }>
-  openPluginDir(path: string): Promise<boolean>
-  updateProjectMeta(args: { id: string; lastOpenedAt?: number; label?: string }): Promise<{ success: boolean; error?: string }>
+  // NEW（pluginProjects[] 模型）
+  addPluginProject(args: { path: string; source?: PluginProjectSource }): Promise<AddPluginProjectResult>
+  removePluginProject(args: { id?: string; path?: string }): Promise<DeveloperOpResult>
+  reloadPlugin(pluginId: string): Promise<DeveloperOpResult>
+  reloadPluginByPath(path: string): Promise<DeveloperOpResult>
+  validatePlugin(path: string): Promise<PluginValidationResult>
+  listPluginProjects(): Promise<PluginProjectStatus[]>
+  createPlugin(args: { targetDir: string; name: string; template?: 'react' | 'basic' }): Promise<CreatePluginResult>
+  buildPlugin(path: string): Promise<BuildPluginResult>
+  packPlugin(path: string): Promise<PackPluginResult>
+  openPluginDir(path: string): Promise<DeveloperOpResult>
+  updateProjectMeta(args: { id: string; lastOpenedAt?: number; label?: string }): Promise<DeveloperOpResult>
 }
 
 interface DesktopFileSearchResult {
@@ -1350,16 +1442,6 @@ interface MulbyLog {
   onLog(callback: (entry: LogEntry) => void): Disposable
 }
 
-type CommandCallerIdentity = {
-  kind: 'app' | 'plugin' | 'ai' | 'openclaw' | 'system'
-  host?: 'app' | 'plugin' | 'openclaw' | 'system'
-  actor?: 'human' | 'ai' | 'remote' | 'system'
-  pluginId?: string
-  pluginType?: string
-  requestId?: string
-  model?: string
-  skillIds?: string[]
-}
 type AiSkillSource = 'manual' | 'local-dir' | 'zip' | 'npx' | 'json' | 'builtin' | 'system'
 type AiSkillTrustLevel = 'untrusted' | 'reviewed' | 'trusted'
 type AiSkillSelectionMeta = {
@@ -1443,7 +1525,11 @@ type AiModelParameters = {
   frequencyPenalty?: number
   stopSequences?: string[]
   seed?: number
+  reasoningEffort?: AiReasoningEffort
+  thinking?: AiThinkingMode
 }
+type AiReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'max'
+type AiThinkingMode = 'enabled' | 'disabled'
 type AiMcpSelection = { mode?: 'off' | 'manual' | 'auto'; serverIds?: string[]; allowedToolIds?: string[] }
 type AiSkillSelection = {
   mode?: 'off' | 'manual' | 'progressive'
@@ -1481,6 +1567,7 @@ type AiModel = {
   supportedEndpointTypes?: AiEndpointType[]
   params?: AiModelParameters
   capabilities?: AiModelCapability[]
+  contextTokens?: number
 }
 type AiModelsFilter = {
   /** 按端点类型筛选（单值或多值）。 */
@@ -1490,9 +1577,24 @@ type AiModelsFilter = {
   /** 按 Provider 实例 ID 精确筛选。 */
   providerId?: string
 }
+type AiProviderId =
+  | 'openai'
+  | 'openai-response'
+  | 'openai-compatible'
+  | 'anthropic'
+  | 'google'
+  | 'gemini'
+  | 'deepseek'
+  | 'openrouter'
+  | 'azure'
+  | 'azure-openai'
+  | 'new-api'
+  | 'cherryin'
+  | 'ollama'
+  | 'custom'
 type AiProviderConfig = {
-  id: string
-  type?: string
+  id: AiProviderId | string
+  type?: AiProviderId | string
   label?: string
   enabled: boolean
   apiKey?: string
@@ -1937,11 +2039,6 @@ interface MulbyAPI {
   subInput: MulbySubInput
   plugin: MulbyPlugin
   pluginStore: MulbyPluginStore
-  directoryAccess: {
-    request(input?: { path?: string; mode?: 'read' | 'readwrite'; title?: string; message?: string; reason?: string }): Promise<{ id: string; pluginId: string; path: string; mode: 'read' | 'readwrite'; source: string; reason?: string; createdAt: number; lastUsedAt?: number } | null>
-    list(): Promise<{ id: string; pluginId: string; path: string; mode: 'read' | 'readwrite'; source: string; reason?: string; createdAt: number; lastUsedAt?: number }[]>
-    revoke(grantIdOrPath: string): Promise<boolean>
-  }
   theme: MulbyTheme
   ai: MulbyAi
   screen: MulbyScreen
