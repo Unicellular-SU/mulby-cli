@@ -65,6 +65,8 @@ export function buildReactPackageJson(name: string) {
       build: 'pnpm run build:backend && pnpm run build:ui',
       'build:backend': 'esbuild src/main.ts --bundle --platform=node --outfile=dist/main.js',
       'build:ui': 'vite build',
+      // esbuild/vite 只转译不查类型；用它做类型检查（CI / 提交前 / AI 自检都会跑）
+      typecheck: 'tsc --noEmit',
       pack: 'pnpm run build && mulby pack'
     },
     dependencies: {

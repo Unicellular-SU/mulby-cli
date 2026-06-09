@@ -45,6 +45,8 @@ export function buildBasicPackageJson(name: string) {
     packageManager: 'pnpm@9.1.0',
     scripts: {
       build: 'esbuild src/main.ts --bundle --platform=node --outfile=dist/main.js',
+      // esbuild 只转译不查类型；用它做类型检查（CI / 提交前 / AI 自检都会跑）
+      typecheck: 'tsc --noEmit',
       dev: 'mulby dev',
       pack: 'mulby pack'
     },
