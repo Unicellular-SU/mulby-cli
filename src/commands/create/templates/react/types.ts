@@ -485,6 +485,7 @@ interface MulbySystemPage {
 
 interface MulbyPlugin {
   prewarm(pluginId: string): Promise<void>
+  prewarmUi(pluginId: string, featureCode?: string, route?: string): Promise<void>
   getAll(): Promise<PluginInfo[]>
   listCommands(pluginId?: string): Promise<PluginCommandItem[]>
   search(query: string | InputPayload): Promise<PluginSearchResult[]>
@@ -521,7 +522,8 @@ interface MulbyPlugin {
   }>
   enable(name: string): Promise<{ success: boolean; error?: string }>
   disable(name: string): Promise<{ success: boolean; error?: string }>
-  uninstall(name: string): Promise<{ success: boolean; error?: string }>
+  uninstall(name: string, options?: { purgeData?: boolean }): Promise<{ success: boolean; error?: string }>
+  getDataStats(name: string): Promise<{ kvCount: number; encryptedCount: number; attachmentCount: number; attachmentBytes: number }>
   getReadme(name: string): Promise<string | null>
   redirect(label: string | [string, string], payload?: unknown): Promise<boolean | { candidates: { name: string; displayName: string }[] }>
   outPlugin(isKill?: boolean): Promise<boolean>
@@ -1014,11 +1016,11 @@ interface MulbyStorage {
   getMany(keys: string[], options?: { namespace?: string }): Promise<{ key: string; found: boolean; value?: unknown; version?: number; updatedAt?: number }[]>
   setMany(items: { key: string; value: unknown; expectedVersion?: number | null }[], options?: { namespace?: string; atomic?: boolean }): Promise<{ success: boolean; results: { key: string; ok: boolean; version?: number; error?: string }[] }>
   getMeta(key: string, options?: { namespace?: string }): Promise<{ found: boolean; value?: unknown; version?: number; updatedAt?: number }>
-  setWithVersion(key: string, value: unknown, options?: { namespace?: string; expectedVersion?: number | null }): Promise<{ ok: boolean; version?: number; conflict?: { currentVersion: number } }>
+  setWithVersion(key: string, value: unknown, options?: { namespace?: string; expectedVersion?: number | null }): Promise<{ ok: boolean; version?: number; conflict?: { currentVersion: number }; error?: string }>
   removeWithVersion(key: string, options?: { namespace?: string; expectedVersion?: number }): Promise<{ ok: boolean; error?: string }>
   transaction(ops: { op: 'set' | 'remove'; key: string; value?: unknown; expectedVersion?: number | null }[], options?: { namespace?: string }): Promise<{ success: boolean; committed: number }>
   append(key: string, chunk: unknown, options?: { namespace?: string; maxItems?: number }): Promise<{ ok: boolean; newLength: number; version: number }>
-  watch(options: { namespace?: string; prefix?: string }, callback: (event: { type: 'set' | 'remove' | 'clear'; key: string; namespace: string; version?: number; updatedAt: number }) => void): () => void
+  watch(options: { namespace?: string; prefix?: string }, callback: (event: { type: 'set' | 'remove' | 'clear'; key: string; namespace: string; version?: number; updatedAt: number; source?: 'kv' | 'attachment' | 'encrypted' }) => void): () => void
   encrypted: {
     set(key: string, value: unknown): Promise<boolean>
     get(key: string): Promise<unknown | undefined>
@@ -1026,7 +1028,7 @@ interface MulbyStorage {
     has(key: string): Promise<boolean>
   }
   attachment: {
-    put(id: string, data: ArrayBuffer | Uint8Array, mimeType: string): Promise<boolean>
+    put(id: string, data: ArrayBuffer | Uint8Array, mimeType: string): Promise<{ ok: boolean; error?: 'E_TOO_LARGE' | 'E_INVALID_ID' | 'E_IO' | 'E_META' }>
     get(id: string): Promise<Uint8Array | null>
     getType(id: string): Promise<string | null>
     remove(id: string): Promise<boolean>
