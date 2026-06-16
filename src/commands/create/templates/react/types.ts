@@ -1487,7 +1487,7 @@ type AiMessage = {
   role: 'system' | 'user' | 'assistant'
   content?: string | AiMessageContent[]
   reasoning_content?: string
-  chunkType?: 'meta' | 'text' | 'reasoning' | 'tool-call' | 'tool-progress' | 'tool-result' | 'error' | 'end'
+  chunkType?: 'meta' | 'text' | 'reasoning' | 'tool-call' | 'tool-progress' | 'tool-result' | 'error' | 'usage' | 'end'
   capability_debug?: AiCapabilityDebugInfo
   policy_debug?: AiPolicyDebugInfo
   tool_call?: { id: string; name: string; args?: unknown }
@@ -1495,6 +1495,10 @@ type AiMessage = {
   tool_result?: { id: string; name: string; result?: unknown }
   error?: { message: string; code?: string; category?: string; retryable?: boolean; statusCode?: number }
   usage?: AiTokenBreakdown
+  /** usage chunk 专用：本轮（单次 LLM 往返）的真实用量；provider 可能只返回单侧 */
+  usage_round?: { inputTokens?: number; outputTokens?: number }
+  /** usage chunk 专用：工具循环轮次（1-based） */
+  tool_round?: number
 }
 type AiMessageContent =
   | { type: 'text'; text: string }
@@ -1529,6 +1533,17 @@ type AiModelParameters = {
   seed?: number
   reasoningEffort?: AiReasoningEffort
   thinking?: AiThinkingMode
+  /**
+   * 结构化输出格式。'json_object' 约束为合法 JSON；'json_schema' 进一步按 jsonSchema 约束结构
+   * （OpenAI response_format / AI SDK Output / Gemini responseSchema）。省略则为普通文本。
+   */
+  responseFormat?: 'json_object' | 'json_schema'
+  /** JSON Schema（responseFormat: 'json_schema' 时生效），约束模型输出符合该结构。 */
+  jsonSchema?: Record<string, unknown>
+  /** 结构化输出 schema 名称（OpenAI 需要），默认 'output'。 */
+  jsonSchemaName?: string
+  /** 严格模式（OpenAI strict / 增强 schema 遵守），默认 true。 */
+  strict?: boolean
 }
 type AiReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'max'
 type AiThinkingMode = 'enabled' | 'disabled'
