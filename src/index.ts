@@ -11,6 +11,8 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { resume } from './commands/resume'
 import { updateTypes } from './commands/update-types'
+import { verify } from './commands/verify'
+import { mcp } from './commands/mcp'
 import chalk from 'chalk'
 
 // 全局错误处理 - 防止进程意外退出
@@ -84,5 +86,25 @@ program
   .option('--dry-run', '仅检查差异，不执行写入')
   .option('-y, --yes', '跳过确认提示，直接更新')
   .action(updateTypes)
+
+program
+  .command('verify [plugin-dir]')
+  .description('用 Mulby 验证插件（加载 / 触发匹配 / 执行 / UI 渲染冒烟），输出报告')
+  .option('--json', '输出 JSON 报告')
+  .option('--strict', '严格模式（warn 也判失败）')
+  .option('--app-path <path>', '指定 Mulby 可执行文件（默认查找已安装位置 / config appPath / MULBY_APP_PATH）')
+  .option('--main <entry>', '指定主进程入口（配合 electron 启动，开发用）')
+  .option('--timeout <ms>', '超时毫秒数（默认 60000）')
+  .option('--keep-userdata', '保留隔离的临时 userData 目录（便于排查）')
+  .action(verify)
+
+program
+  .command('mcp')
+  .description('启动插件验证 MCP server（Streamable HTTP），供 AI IDE 连接边改边验')
+  .option('--app-path <path>', '指定 Mulby 可执行文件')
+  .option('--main <entry>', '指定主进程入口（开发用）')
+  .option('--port <n>', '固定端口（默认随机）')
+  .option('--token <t>', 'Bearer token（鉴权；不设则仅本机无鉴权）')
+  .action(mcp)
 
 program.parse()
