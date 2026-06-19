@@ -414,6 +414,7 @@ interface BackgroundPluginInfo {
   startedAt?: number
   uptime?: number
   memoryUsage?: number
+  rendererMemoryUsage?: number
   cpuUsage?: number
   requestCount?: number
   errorCount?: number
@@ -473,6 +474,7 @@ interface MulbySystemPage {
     settingsSection?: 'dashboard' | 'general' | 'superPanel' | 'shortcuts' | 'commandQuickLaunch' | 'commandAll' | 'permissions' | 'security' | 'openclaw' | 'developer' | 'about'
     shortcutCommandHint?: string
     detailsPluginId?: string
+    storeFilter?: 'updatable'
   }): Promise<boolean>
   close(): Promise<boolean>
   detach(): Promise<boolean>
@@ -1823,7 +1825,7 @@ interface MulbyAi {
       input: { model: string; prompt: string; size?: string; count?: number },
       onChunk: (chunk: AiImageGenerateProgressChunk) => void
     ): AiPromiseLike<{ images: string[]; tokens: AiTokenBreakdown }>
-    edit(input: { model: string; imageAttachmentId: string; prompt: string }): Promise<{ images: string[]; tokens: AiTokenBreakdown }>
+    edit(input: { model: string; imageAttachmentId: string; prompt: string; referenceAttachmentIds?: string[] }): Promise<{ images: string[]; tokens: AiTokenBreakdown }>
   }
   models: {
     fetch(input: { providerId: string; baseURL?: string; apiKey?: string }): Promise<{ models: AiModel[]; message?: string }>
@@ -1893,6 +1895,7 @@ interface MulbyAi {
     getClientConfig(): Promise<{
       claudeDesktop: object
       cursor: object
+      cherryStudio: object
       generic: object
     }>
     refreshTools(): Promise<unknown>
