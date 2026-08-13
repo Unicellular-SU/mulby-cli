@@ -726,6 +726,75 @@ function collectTypeShape(typeName, sf) {
   return out
 }
 
+function collectApiMethodSignatures(typeName, sf) {
+  const declarations = buildDeclarationMap(sf)
+  const root = declarations.get(typeName)
+  if (!root) {
+    throw new Error(`Unable to locate API declaration ${typeName}`)
+  }
+
+  const out = new Set()
+  const seenRefs = new Set()
+  const normalizeType = (node) => node?.getText(sf)
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '')
+    .replace(/[\s;,]+/g, '') || 'unknown'
+  const normalizeSignature = (parameters, returnType) => {
+    const args = parameters.map((parameter) => {
+      const rest = parameter.dotDotDotToken ? '...' : ''
+      const optional = parameter.questionToken || parameter.initializer ? '?' : ''
+      return `${rest}${optional}:${normalizeType(parameter.type)}`
+    })
+    return `(${args.join(',')})->${normalizeType(returnType)}`
+  }
+
+  function walkTypeNode(typeNode, prefix) {
+    if (!typeNode) return
+    if (ts.isTypeLiteralNode(typeNode)) {
+      walkMembers(typeNode.members, prefix)
+      return
+    }
+    if (ts.isTypeReferenceNode(typeNode) && ts.isIdentifier(typeNode.typeName)) {
+      const refName = typeNode.typeName.text
+      const refDecl = declarations.get(refName)
+      if (!refDecl) return
+      const refKey = `${prefix}:${refName}`
+      if (seenRefs.has(refKey)) return
+      seenRefs.add(refKey)
+      if (ts.isInterfaceDeclaration(refDecl)) {
+        walkMembers(refDecl.members, prefix)
+      } else if (ts.isTypeAliasDeclaration(refDecl)) {
+        walkTypeNode(refDecl.type, prefix)
+      }
+    }
+  }
+
+  function walkMembers(members, prefix = '') {
+    for (const member of members) {
+      const name = getPropName(member.name)
+      if (!name) continue
+      const path = `${prefix}${name}`
+      if (ts.isMethodSignature(member)) {
+        out.add(`${path} ${normalizeSignature(member.parameters, member.type)}`)
+        continue
+      }
+      if (!ts.isPropertySignature(member) || !member.type) continue
+      if (ts.isFunctionTypeNode(member.type)) {
+        out.add(`${path} ${normalizeSignature(member.type.parameters, member.type.type)}`)
+        continue
+      }
+      walkTypeNode(member.type, `${path}.`)
+    }
+  }
+
+  if (ts.isInterfaceDeclaration(root)) {
+    walkMembers(root.members)
+  } else if (ts.isTypeAliasDeclaration(root)) {
+    walkTypeNode(root.type, '')
+  }
+  return out
+}
+
 function collectApiShape(typeName, sf, options = {}) {
   const declarations = buildDeclarationMap(sf)
   const decl = declarations.get(typeName)
@@ -868,6 +937,42 @@ const templateSource = parseSource('mulby-template.d.ts', extractTemplateDeclara
 const aiTypeNames = [
   'AiSkillSource',
   'AiMessage',
+  'AiImageSizeFormat',
+  'AiImageEditTransport',
+  'AiImageOperation',
+  'AiImageInputRole',
+  'AiImageResolution',
+  'AiImageOutputFormat',
+  'AiImageBackground',
+  'AiImageTaskState',
+  'AiImageTaskErrorCode',
+  'AiImageRecoveryAction',
+  'AiModel',
+  'AiProviderConfig',
+  'AiImageRequest',
+  'AiImageOutputOptions',
+  'AiImageCapabilities',
+  'AiImageCapabilityOverrides',
+  'AiImageProviderConfig',
+  'AiImageModelConfig',
+  'AiImageTask',
+  'AiImageTaskError',
+  'AiImageOperationErrorPayload',
+  'AiImageTaskEvent',
+  'AiImageProviderDescription',
+  'AiImageValidationResult',
+  'AiImageGenerateProgressChunk',
+  'AiImageSystemTaskListInput',
+  'AiImageTaskExportSelection',
+  'AiImageTaskExportPreview',
+  'AiImageTaskExportRequest',
+  'AiImageSystemTaskSummary',
+  'AiImageSystemTaskDetail',
+  'AiImageSystemTaskEvent',
+  'AiImageSystemTaskEventPage',
+  'AiImageArtifactPreview',
+  'ImageProtocolResolutionDiagnostic',
+  'AiTestConnectionInput',
   'AiSkillDescriptor',
   'AiSkillRecord',
   'AiSkillResolveResult',
@@ -878,6 +983,10 @@ const aiTypeDiffs = aiTypeNames.map((typeName) => ({
   typeName,
   diff: diffSets(collectTypeShape(typeName, aiSource), collectTypeShape(typeName, templateSource))
 }))
+const rendererImageSignatureDiff = diffSets(
+  [...collectApiMethodSignatures('AiApi', aiSource)].filter((entry) => entry.startsWith('images.')),
+  [...collectApiMethodSignatures('MulbyAi', templateSource)].filter((entry) => entry.startsWith('images.'))
+)
 const apiShapeDiffs = [
   { label: 'renderer API shape', diff: diffSets(rendererShape, declaredRendererShape) },
   { label: 'backend API shape', diff: diffSets(backendShape, declaredBackendShape) }
@@ -894,13 +1003,17 @@ for (const { typeName, diff } of aiTypeDiffs) {
   printDiff(`AI type shape ${typeName}`, diff)
 }
 
+printDiff('renderer ai.images signatures', rendererImageSignatureDiff)
+
 if (
   rendererDiff.missing.length > 0 ||
   rendererDiff.extra.length > 0 ||
   backendDiff.missing.length > 0 ||
   backendDiff.extra.length > 0 ||
   apiShapeDiffs.some(({ diff }) => diff.missing.length > 0 || diff.extra.length > 0) ||
-  aiTypeDiffs.some(({ diff }) => diff.missing.length > 0 || diff.extra.length > 0)
+  aiTypeDiffs.some(({ diff }) => diff.missing.length > 0 || diff.extra.length > 0) ||
+  rendererImageSignatureDiff.missing.length > 0 ||
+  rendererImageSignatureDiff.extra.length > 0
 ) {
   process.exitCode = 1
 }
