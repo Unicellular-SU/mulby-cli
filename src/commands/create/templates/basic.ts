@@ -84,7 +84,7 @@ export async function run(context: BackendPluginContext) {
   const result = text.toUpperCase()
 
   await mulby.clipboard.writeText(result)
-  mulby.notification.show('Done')
+  await mulby.notification.show('Done')
 }
 
 const plugin = { onLoad, onUnload, onEnable, onDisable, run }
@@ -163,21 +163,21 @@ For plugin-to-plugin messaging, keep subscriptions in the backend and expose cac
 let messageHandler: ((message: PluginMessage) => void | Promise<void>) | null = null
 const recentMessages: PluginMessage[] = []
 
-function registerMessaging(api: BackendPluginAPI) {
-  if (messageHandler) api.messaging.off(messageHandler)
+async function registerMessaging(api: BackendPluginAPI) {
+  if (messageHandler) await api.messaging.off(messageHandler)
   messageHandler = (message) => {
     recentMessages.unshift(message)
     recentMessages.splice(50)
   }
-  api.messaging.on(messageHandler)
+  await api.messaging.on(messageHandler)
 }
 
-export function onLoad(context?: BackendPluginContext) {
-  if (context) registerMessaging(context.api)
+export async function onLoad(context?: BackendPluginContext) {
+  if (context) await registerMessaging(context.api)
 }
 
-export function onBackground(context?: BackendPluginContext) {
-  if (context) registerMessaging(context.api)
+export async function onBackground(context?: BackendPluginContext) {
+  if (context) await registerMessaging(context.api)
 }
 
 export const rpc = {

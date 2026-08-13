@@ -443,6 +443,7 @@ interface MulbyApp {
   onOpenAiMcpSettings(callback: () => void): Disposable
   onOpenAiSkillsSettings(callback: () => void): Disposable
   onOpenAiToolsSettings(callback: () => void): Disposable
+  onOpenAiImageTasks(callback: () => void): Disposable
   onOpenPluginStore(callback: () => void): Disposable
   onOpenPluginManager(callback: (pluginId?: string) => void): Disposable
   onOpenBackgroundPlugins(callback: () => void): Disposable
@@ -1487,6 +1488,8 @@ type AiMessage = {
   role: 'system' | 'user' | 'assistant'
   content?: string | AiMessageContent[]
   reasoning_content?: string
+  /** 流式调用建立后首个合成 chunk；用于配合 ai.abort() 中止请求。 */
+  __requestId?: string
   chunkType?: 'meta' | 'text' | 'reasoning' | 'tool-call' | 'tool-progress' | 'tool-result' | 'error' | 'usage' | 'end'
   capability_debug?: AiCapabilityDebugInfo
   policy_debug?: AiPolicyDebugInfo
@@ -1573,6 +1576,411 @@ type AiOption = {
 type AiEndpointType = 'openai' | 'openai-response' | 'anthropic' | 'gemini' | 'image-generation' | 'jina-rerank'
 type AiModelType = 'text' | 'vision' | 'embedding' | 'reasoning' | 'function_calling' | 'web_search' | 'rerank'
 type AiModelCapability = { type: AiModelType; isUserSelected?: boolean }
+
+type AiImageSizeFormat = 'pixels' | 'ratio' | 'omit'
+type AiImageEditTransport = 'multipart' | 'uploads'
+type AiImageOperation = 'generate' | 'edit' | 'inpaint' | 'variation'
+type AiImageInputRole = 'source' | 'reference' | 'mask'
+type AiImageResolution = 'auto' | '512' | '1K' | '2K' | '4K'
+type AiImageOutputFormat = 'png' | 'jpeg' | 'webp'
+type AiImageBackground = 'auto' | 'opaque' | 'transparent'
+
+interface AiImageOutputOptions {
+  aspectRatio?: string
+  exactSize?: { width: number; height: number }
+  resolution?: AiImageResolution
+  quality?: string
+  format?: AiImageOutputFormat
+  background?: AiImageBackground
+  count?: number
+}
+
+interface AiImageRequest {
+  operation: AiImageOperation
+  model: string
+  prompt: string
+  clientTag?: string
+  inputs?: Array<{
+    attachmentId: string
+    role: AiImageInputRole
+  }>
+  output?: AiImageOutputOptions
+  providerOptions?: Record<string, unknown>
+}
+
+interface AiImageProviderOptionSchema {
+  type: 'string' | 'number' | 'boolean'
+  description?: string
+  enum?: Array<string | number | boolean>
+  minimum?: number
+  maximum?: number
+}
+
+interface AiImageCapabilities {
+  operations: AiImageOperation[]
+  input: {
+    maxSourceImages: number
+    maxReferenceImages: number
+    supportsMask: boolean
+    acceptedMimeTypes: string[]
+    maxBytesPerImage?: number
+  }
+  output: {
+    sizeMode: 'exact' | 'ratio' | 'resolution' | 'omit'
+    exactSizes?: Array<{ width: number; height: number }>
+    aspectRatios?: string[]
+    resolutions?: AiImageResolution[]
+    formats?: AiImageOutputFormat[]
+    qualities?: string[]
+    backgrounds?: AiImageBackground[]
+    maxCount: number
+  }
+  lifecycle: {
+    mode: 'sync' | 'stream' | 'async'
+    nativePreview: boolean
+    cancellable: boolean
+  }
+  providerOptions?: Record<string, AiImageProviderOptionSchema>
+}
+
+interface AiImageCapabilityOverrides {
+  operations?: AiImageOperation[]
+  input?: Partial<AiImageCapabilities['input']>
+  output?: Partial<AiImageCapabilities['output']>
+  lifecycle?: Partial<AiImageCapabilities['lifecycle']>
+  providerOptions?: Record<string, AiImageProviderOptionSchema>
+}
+
+interface AiImageProviderConfig {
+  profileId: string
+  profileVersion?: string
+  allowInsecureLocalhost?: boolean
+  endpointOverrides?: {
+    generate?: string
+    edit?: string
+    upload?: string
+    poll?: string
+    cancel?: string
+  }
+  capabilityOverrides?: AiImageCapabilityOverrides
+}
+
+interface AiImageModelConfig {
+  profileId?: string
+  capabilityOverrides?: AiImageCapabilityOverrides
+}
+
+type AiImageTaskState =
+  | 'queued'
+  | 'preparing'
+  | 'submitting'
+  | 'submitted'
+  | 'running'
+  | 'cancelling'
+  | 'downloading'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'blocked'
+  | 'unknown'
+  | 'reconciling'
+  | 'safe_to_retry'
+
+type AiImageSystemTaskGroup =
+  | 'all'
+  | 'active'
+  | 'completed'
+  | 'failed_or_blocked'
+  | 'billing_risk'
+
+interface AiImageSystemTaskListInput {
+  group?: AiImageSystemTaskGroup
+  query?: string
+  limit?: number
+  cursor?: string
+}
+
+type AiImageTaskExportScope =
+  | { kind: 'current'; taskId: string }
+  | { kind: 'selected'; taskIds: string[] }
+  | { kind: 'filtered'; group?: AiImageSystemTaskGroup; query?: string }
+  | { kind: 'all' }
+
+interface AiImageTaskExportContents {
+  prompt: boolean
+  base64: boolean
+  sourceUrls: boolean
+  imageBinary: boolean
+}
+
+interface AiImageTaskExportSelection {
+  scope: AiImageTaskExportScope
+  contents: AiImageTaskExportContents
+}
+
+interface AiImageTaskExportPreview {
+  taskCount: number
+  artifactCount: number
+  sourceUrlCount: number
+  unavailableSourceTaskCount: number
+  missingTaskIds: string[]
+  sensitiveKinds: Array<'prompt' | 'base64' | 'sourceUrls' | 'imageBinary'>
+}
+
+interface AiImageTaskExportRequest extends AiImageTaskExportSelection {
+  confirmSensitive: boolean
+}
+
+type AiImageTaskExportResult =
+  | { cancelled: true }
+  | {
+      cancelled: false
+      fileName: string
+      taskCount: number
+      artifactCount: number
+      bytesWritten: number
+    }
+
+interface AiImageRequestSummary {
+  operation: AiImageOperation
+  model: string
+  clientTag?: string
+  inputCount: number
+  output?: AiImageOutputOptions
+}
+
+interface AiImageArtifact {
+  artifactId: string
+  attachmentId: string
+  mimeType: string
+  size: number
+  width?: number
+  height?: number
+  sha256: string
+  createdAt: string
+}
+
+interface AiImageUsage {
+  inputTokens?: number
+  outputTokens?: number
+  generatedImages?: number
+  source: 'provider' | 'estimated'
+}
+
+type AiImageTaskErrorCode =
+  | 'invalid_request'
+  | 'unsupported_operation'
+  | 'unsupported_parameter'
+  | 'auth_failed'
+  | 'permission_denied'
+  | 'rate_limited'
+  | 'quota_exceeded'
+  | 'content_policy'
+  | 'input_upload_failed'
+  | 'provider_rejected'
+  | 'provider_unavailable'
+  | 'network_policy'
+  | 'submit_ambiguous'
+  | 'provider_task_not_found'
+  | 'poll_failed'
+  | 'download_failed'
+  | 'protocol_response_mismatch'
+  | 'reconcile_failed'
+  | 'legacy_result_too_large'
+  | 'cancelled'
+  | 'timeout'
+  | 'internal_error'
+
+interface AiImageTaskError {
+  code: AiImageTaskErrorCode
+  phase: 'validate' | 'prepare' | 'submit' | 'poll' | 'cancel' | 'download'
+  message: string
+  retryable: boolean
+  billed: 'yes' | 'no' | 'unknown'
+  providerCode?: string
+  httpStatus?: number
+  details?: Record<string, unknown>
+}
+
+type AiImageRecoveryAction =
+  | 'retry_pre_dispatch'
+  | 'resume_poll'
+  | 'resume_download'
+  | 'confirm_regenerate'
+  | 'none'
+
+interface AiImageOperationErrorPayload {
+  message: string
+  code: AiImageTaskErrorCode
+  phase: AiImageTaskError['phase']
+  taskId: string
+  retryable: boolean
+  billed: 'yes' | 'no' | 'unknown'
+  recoveryAction: AiImageRecoveryAction
+}
+
+interface AiImageTask {
+  taskId: string
+  clientTag?: string
+  request: AiImageRequestSummary
+  state: AiImageTaskState
+  revision: number
+  progress?: number
+  artifacts: AiImageArtifact[]
+  error?: AiImageTaskError
+  usage?: AiImageUsage
+  billed: 'yes' | 'no' | 'unknown'
+  downloadAttempt: number
+  recoveryAction: AiImageRecoveryAction
+  retryOf?: string
+  cancellation?: {
+    scope: 'provider' | 'local'
+    remoteMayContinue: boolean
+    requestedAt: string
+  }
+  createdAt: string
+  updatedAt: string
+  completedAt?: string
+}
+
+interface AiImagePreview {
+  image: string
+  index?: number
+  mimeType?: string
+}
+
+interface AiImageTaskEvent {
+  eventId: string
+  taskId: string
+  revision: number
+  type:
+    | 'state_changed'
+    | 'progress'
+    | 'preview'
+    | 'artifact_ready'
+    | 'warning'
+    | 'output_refreshed'
+    | 'terminal'
+  state: AiImageTaskState
+  progress?: number
+  preview?: AiImagePreview
+  artifact?: AiImageArtifact
+  error?: AiImageTaskError
+  timestamp: number
+}
+
+interface AiImageSystemTaskSummary extends AiImageTask {
+  ownerPluginId: string
+  providerId: string
+  profileId: string
+  profileVersion: string
+  bindingId?: string
+  adapter: { id: string; version: string }
+  resolution?: ImageProtocolResolutionDiagnostic
+}
+
+interface AiImageCancellationExpectation {
+  scope: 'provider' | 'local'
+  remoteMayContinue: boolean
+}
+
+type AiImageSystemTaskUnavailableReason =
+  | 'historical_source_not_retained'
+  | 'provider_returned_no_urls'
+  | 'task_not_completed'
+  | 'decrypt_failed'
+
+interface AiImageSystemTaskDetail extends AiImageSystemTaskSummary {
+  fullRequest?: AiImageRequest
+  fullRequestUnavailableReason?: 'decrypt_failed'
+  cancelExpectation: AiImageCancellationExpectation
+  lifecycle?: AiImageCapabilities['lifecycle']
+  lifecycleUnavailableReason?: 'decrypt_failed' | 'historical_profile_not_retained'
+  sourceExport: {
+    available: boolean
+    urlCount: number
+    unavailableReason?: AiImageSystemTaskUnavailableReason
+  }
+}
+
+interface AiImageSystemTaskEvent {
+  eventId: string
+  taskId: string
+  revision: number
+  type: AiImageTaskEvent['type']
+  state: AiImageTaskState
+  progress?: number
+  preview?: {
+    available: boolean
+    index?: number
+    mimeType?: string
+  }
+  artifact?: AiImageArtifact
+  error?: AiImageTaskError
+  usage?: AiImageUsage
+  timestamp: number
+}
+
+interface AiImageSystemTaskEventPage {
+  events: AiImageSystemTaskEvent[]
+  nextCursor?: string
+}
+
+interface AiImageArtifactPreview {
+  artifactId: string
+  mimeType: 'image/webp'
+  width?: number
+  height?: number
+  dataUrl: string
+}
+
+interface AiImageValidationIssue {
+  code: AiImageTaskErrorCode
+  message: string
+  path?: string
+}
+
+interface ImageProtocolResolutionDiagnostic {
+  providerId: string
+  configuredOrigin: string
+  providerModelId: string
+  canonicalModelId?: string
+  modelsDevProviderId?: string
+  matchedBindingId?: string
+  profileId?: string
+  profileVersion?: string
+  capabilitySources: Record<string, string>
+  candidates: Array<{
+    bindingId: string
+    matched: boolean
+    reason: string
+  }>
+  unresolvedReasons: string[]
+}
+
+interface AiImageProviderDescription {
+  providerId: string
+  model?: string
+  profile: {
+    id: string
+    version: string
+    adapter: string
+  }
+  capabilities: AiImageCapabilities
+  capabilitySources: Record<string, string>
+  warnings: AiImageValidationIssue[]
+  requiresConfirmation: boolean
+  resolution?: ImageProtocolResolutionDiagnostic
+}
+
+interface AiImageValidationResult {
+  valid: boolean
+  normalized?: AiImageRequest
+  errors: AiImageValidationIssue[]
+  warnings: AiImageValidationIssue[]
+  provider?: AiImageProviderDescription
+}
+
 type AiModel = {
   id: string
   label: string
@@ -1581,6 +1989,21 @@ type AiModel = {
   providerRef?: string
   providerLabel?: string
   endpointType?: AiEndpointType
+  imageSizeFormat?: AiImageSizeFormat
+  imageEditTransport?: AiImageEditTransport
+  images?: AiImageModelConfig
+  catalogIdentity?: {
+    source: 'models.dev'
+    providerId?: string
+    providerModelId: string
+    canonicalModelId?: string
+    family?: string
+    match: 'exact-provider-model' | 'unique-alias' | 'ambiguous'
+  }
+  modalities?: {
+    input: Array<'text' | 'image' | 'audio' | 'video' | 'pdf'>
+    output: Array<'text' | 'image' | 'audio' | 'video' | 'pdf'>
+  }
   supportedEndpointTypes?: AiEndpointType[]
   params?: AiModelParameters
   capabilities?: AiModelCapability[]
@@ -1621,6 +2044,10 @@ type AiProviderConfig = {
   headers?: Record<string, string>
   defaultModel?: string
   defaultParams?: AiModelParameters
+  imageSizeFormat?: AiImageSizeFormat
+  imageEditTransport?: AiImageEditTransport
+  imageUploadsURL?: string
+  images?: AiImageProviderConfig
 }
 type AiMcpServer = {
   id: string
@@ -1770,18 +2197,32 @@ type AiSettings = {
 type AiAttachmentRef = { attachmentId: string; mimeType: string; size: number; filename?: string; expiresAt?: string; purpose?: string }
 type AiTokenBreakdown = { inputTokens: number; outputTokens: number }
 type AiImageGenerateProgressChunk = {
-  type: 'status' | 'preview'
+  /** 业务 chunk 有 type；仅携带 __requestId 的合成 chunk 没有 type。 */
+  type?: 'status' | 'preview'
   stage?: 'start' | 'partial' | 'finalizing' | 'completed' | 'fallback'
   message?: string
   image?: string
   index?: number
   received?: number
   total?: number
+  __requestId?: string
 }
-type AiPromiseLike<T> = Promise<T> & { abort: () => void }
+
+interface AiTestConnectionInput {
+  model?: string
+  providerId?: string
+  providerType?: string
+  endpointType?: AiEndpointType
+  apiKey?: string
+  baseURL?: string
+  anthropicBaseURL?: string
+  apiVersion?: string
+  headers?: Record<string, string>
+}
 
 interface MulbyAi {
-  call(option: AiOption, onChunk?: (chunk: AiMessage) => void): AiPromiseLike<AiMessage>
+  /** contextBridge 不保留 Promise 自定义属性；中止流请读取首个 chunk 的 __requestId 后调用 abort。 */
+  call(option: AiOption, onChunk?: (chunk: AiMessage) => void): Promise<AiMessage>
   allModels(filter?: AiModelsFilter): Promise<AiModel[]>
   abort(requestId: string): Promise<void>
   skills: {
@@ -1818,27 +2259,70 @@ interface MulbyAi {
     }): Promise<{ providerId: string; fileId: string; uri?: string }>
   }
   images: {
-    generate(input: { model: string; prompt: string; size?: string; count?: number }): Promise<{ images: string[]; tokens: AiTokenBreakdown }>
+    generate(input: { prompt: string; model: string; size?: string; aspectRatio?: string; count?: number }): Promise<{ images: string[]; tokens: AiTokenBreakdown }>
     generateStream(
-      input: { model: string; prompt: string; size?: string; count?: number },
+      input: { prompt: string; model: string; size?: string; aspectRatio?: string; count?: number },
       onChunk: (chunk: AiImageGenerateProgressChunk) => void
-    ): AiPromiseLike<{ images: string[]; tokens: AiTokenBreakdown }>
+    ): Promise<{ images: string[]; tokens: AiTokenBreakdown }>
     edit(input: {
-      model: string
       imageAttachmentId: string
       prompt: string
+      model: string
       /** 额外参考图（多图一致性 / 按参考图条件生成，如 Gemini 多图）；附在主图之后 */
       referenceAttachmentIds?: string[]
+      size?: string
+      aspectRatio?: string
+      maskAttachmentId?: string
+      requestId?: string
     }): Promise<{ images: string[]; tokens: AiTokenBreakdown }>
+    profiles: {
+      /** 仅 Mulby 系统设置页可用；普通插件调用会被主进程拒绝。 */
+      listAvailable(): Promise<string[]>
+    }
+    providers: {
+      describe(input: { providerId?: string; model?: string }): Promise<AiImageProviderDescription>
+    }
+    validateInput(request: AiImageRequest): Promise<AiImageValidationResult>
+    systemTasks: {
+      /** 仅 Mulby 系统 UI 可用；普通插件和不可信调用方会被拒绝。 */
+      list(input?: AiImageSystemTaskListInput): Promise<{ tasks: AiImageSystemTaskSummary[]; nextCursor?: string }>
+      getDetail(input: { taskId: string }): Promise<AiImageSystemTaskDetail | null>
+      listEvents(input: { taskId: string; cursor?: string; limit?: number }): Promise<AiImageSystemTaskEventPage>
+      getArtifactPreview(input: { taskId: string; artifactId: string }): Promise<AiImageArtifactPreview>
+      previewExport(selection: AiImageTaskExportSelection): Promise<AiImageTaskExportPreview>
+      exportArchive(request: AiImageTaskExportRequest): Promise<AiImageTaskExportResult>
+    }
+    tasks: {
+      submit(request: AiImageRequest): Promise<AiImageTask>
+      get(input: { taskId: string }): Promise<AiImageTask | null>
+      list(input?: {
+        states?: AiImageTaskState[]
+        clientTag?: string
+        limit?: number
+        cursor?: string
+      }): Promise<{ tasks: AiImageTask[]; nextCursor?: string }>
+      cancel(input: { taskId: string }): Promise<AiImageTask>
+      retry(input: {
+        taskId: string
+        confirmBillableRisk?: boolean
+      }): Promise<{ task: AiImageTask; createdNewTask: boolean }>
+      subscribe(input?: {
+        taskId?: string
+        clientTag?: string
+        sinceRevision?: number
+      }): Promise<{ subscriptionId: string; snapshots: AiImageTask[] }>
+      unsubscribe(input: { subscriptionId: string }): Promise<void>
+      onEvent(listener: (event: AiImageTaskEvent) => void): () => void
+    }
   }
   models: {
     fetch(input: { providerId: string; baseURL?: string; apiKey?: string }): Promise<{ models: AiModel[]; message?: string }>
   }
-  testConnection(input?: { providerId?: string; model?: string; baseURL?: string; apiKey?: string }): Promise<{ success: boolean; message?: string }>
+  testConnection(input?: AiTestConnectionInput): Promise<{ success: boolean; message?: string }>
   testConnectionStream(
-    input: { providerId?: string; model?: string; baseURL?: string; apiKey?: string },
+    input: AiTestConnectionInput,
     onChunk: (chunk: { type: 'reasoning' | 'content'; text: string }) => void
-  ): AiPromiseLike<{ success: boolean; message?: string; reasoning?: string }>
+  ): Promise<{ success: boolean; message?: string; reasoning?: string }>
   settings: {
     get(): Promise<AiSettings>
     update(next: Partial<AiSettings>): Promise<AiSettings>
@@ -1899,6 +2383,7 @@ interface MulbyAi {
     getClientConfig(): Promise<{
       claudeDesktop: object
       cursor: object
+      cherryStudio: object
       generic: object
     }>
     refreshTools(): Promise<unknown>
@@ -2106,6 +2591,7 @@ interface MulbyAPI {
   onPluginLaunchEnd(callback: (data: PluginLaunchEndEvent) => void): Disposable
   onThemeChange(callback: (theme: 'light' | 'dark') => void): Disposable
   onWindowStateChange(callback: (state: { isMaximized: boolean }) => void): Disposable
+  onModeChange(callback: (data: { mode: 'attached' | 'detached'; windowType?: string; pluginName?: string }) => void): Disposable
   inbrowser: {
     goto: (url: string, headers?: Record<string, string>, timeout?: number) => any
     useragent: (ua: string) => any
@@ -2249,9 +2735,10 @@ interface BackendScheduler {
 }
 
 interface BackendMulbyAi {
-  call(option: AiOption, onChunk?: (chunk: AiMessage) => void): AiPromiseLike<AiMessage>
+  /** UtilityProcess 无法传递流回调或 Promise 自定义属性；后端只返回最终消息。 */
+  call(option: AiOption): Promise<AiMessage>
   allModels(filter?: AiModelsFilter): Promise<AiModel[]>
-  abort(requestId: string): void
+  abort(requestId: string): Promise<void>
   skills: {
     listEnabled(): Promise<AiSkillRecord[]>
     previewForCall(input: { option?: Partial<AiOption>; skillIds?: string[]; prompt?: string }): Promise<AiSkillPreview>
@@ -2263,21 +2750,51 @@ interface BackendMulbyAi {
     uploadToProvider(input: { attachmentId: string; model?: string; providerId?: string; purpose?: string }): Promise<{ providerId: string; fileId: string; uri?: string }>
   }
   tokens: {
-    estimate(input: { model?: string; messages: AiMessage[]; outputText?: string }): Promise<AiTokenBreakdown>
+    estimate(input: { model?: string; messages: AiMessage[]; attachments?: AiAttachmentRef[]; outputText?: string }): Promise<AiTokenBreakdown>
   }
   images: {
-    generate(input: { prompt: string; model: string; size?: string; count?: number }): Promise<{ images: string[]; tokens: AiTokenBreakdown }>
+    generate(input: { prompt: string; model: string; size?: string; aspectRatio?: string; count?: number }): Promise<{ images: string[]; tokens: AiTokenBreakdown }>
+    /** 后端流回调无法跨 UtilityProcess；该方法仅返回最终结果，长任务优先使用 tasks。 */
     generateStream(
-      input: { prompt: string; model: string; size?: string; count?: number },
-      onChunk: (chunk: AiImageGenerateProgressChunk) => void
-    ): AiPromiseLike<{ images: string[]; tokens: AiTokenBreakdown }>
+      input: { prompt: string; model: string; size?: string; aspectRatio?: string; count?: number }
+    ): Promise<{ images: string[]; tokens: AiTokenBreakdown }>
     edit(input: {
       imageAttachmentId: string
       prompt: string
       model: string
       /** 额外参考图（多图一致性 / 按参考图条件生成，如 Gemini 多图）；附在主图之后 */
       referenceAttachmentIds?: string[]
+      size?: string
+      aspectRatio?: string
+      maskAttachmentId?: string
+      requestId?: string
     }): Promise<{ images: string[]; tokens: AiTokenBreakdown }>
+    providers: {
+      describe(input: { providerId?: string; model?: string }): Promise<AiImageProviderDescription>
+    }
+    validateInput(request: AiImageRequest): Promise<AiImageValidationResult>
+    tasks: {
+      submit(request: AiImageRequest): Promise<AiImageTask>
+      get(input: { taskId: string }): Promise<AiImageTask | null>
+      list(input?: {
+        states?: AiImageTaskState[]
+        clientTag?: string
+        limit?: number
+        cursor?: string
+      }): Promise<{ tasks: AiImageTask[]; nextCursor?: string }>
+      cancel(input: { taskId: string }): Promise<AiImageTask>
+      retry(input: {
+        taskId: string
+        confirmBillableRisk?: boolean
+      }): Promise<{ task: AiImageTask; createdNewTask: boolean }>
+      subscribe(input?: {
+        taskId?: string
+        clientTag?: string
+        sinceRevision?: number
+      }): Promise<{ subscriptionId: string; snapshots: AiImageTask[] }>
+      unsubscribe(input: { subscriptionId: string }): Promise<void>
+      onEvent(listener: (event: AiImageTaskEvent) => void | Promise<void>): Disposable
+    }
   }
 }
 

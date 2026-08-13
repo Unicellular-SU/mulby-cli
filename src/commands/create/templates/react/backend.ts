@@ -29,7 +29,7 @@ export function onDisable() {
 
 // run 是插件入口，context 由宿主注入（包含 featureCode / input / attachments / api）
 export async function run(_context: BackendPluginContext) {
-  mulby.notification.show('插件已启动')
+  await mulby.notification.show('插件已启动')
 }
 
 // ─── 供 UI 调用的后端方法 ───────────────────────────────────────────
@@ -39,7 +39,7 @@ export async function run(_context: BackendPluginContext) {
 export const rpc = {
   // 示例方法：处理数据
   async processData(data: any) {
-    mulby.notification.show('处理数据中...')
+    await mulby.notification.show('处理数据中...')
 
     // 处理逻辑
     const result = {
@@ -80,13 +80,13 @@ export const rpc = {
 // let messageHandler: ((message: PluginMessage) => void | Promise<void>) | null = null
 // const recentMessages: PluginMessage[] = []
 //
-// function registerMessaging(api: BackendPluginAPI) {
-//   if (messageHandler) api.messaging.off(messageHandler)
+// async function registerMessaging(api: BackendPluginAPI) {
+//   if (messageHandler) await api.messaging.off(messageHandler)
 //   messageHandler = (message) => {
 //     recentMessages.unshift(message)
 //     recentMessages.splice(50)
 //   }
-//   api.messaging.on(messageHandler)
+//   await api.messaging.on(messageHandler)
 // }
 
 const plugin = { onLoad, onUnload, onEnable, onDisable, run, rpc }
